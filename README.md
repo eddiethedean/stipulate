@@ -7,7 +7,7 @@
 Stipulate turns Python structural interfaces into contracts you can use with existing type checkers, validate at runtime, and compare as they evolve.
 
 ```python
-from stipulate import Interface, validate
+from stipulate import Interface
 
 
 class Repository(Interface):
@@ -16,64 +16,98 @@ class Repository(Interface):
     async def save(self, id: int, value: str) -> None: ...
 
 
-repo = validate(Repository, candidate)
+repo = Repository.validate(candidate)
 ```
 
 Implementations remain ordinary Python classes. They do not need to inherit from Stipulate, register themselves, or use decorators.
 
-## Why Stipulate?
-
-Static typing works when the checker can see an implementation. Real applications also load plugins, inject services, select backends from configuration, and accept third-party implementations dynamically.
-
-Stipulate validates those boundaries using the same structural contracts developers already use for typing.
-
-It is built around three capabilities:
-
-### Define
+## Define
 
 ```python
 class Storage(Interface):
     def read(self, key: str) -> bytes | None: ...
 ```
 
-Interfaces remain useful to mypy, Pyright, Pylance, IDEs, and ordinary Python annotations.
+Interfaces remain useful to Python's structural typing ecosystem and are designed to work with existing type checkers.
 
-### Validate
+## Validate
+
+Enforce the contract:
 
 ```python
-storage = validate(Storage, candidate)
+storage = Storage.validate(candidate)
 ```
 
-Stipulate checks interface compatibility beyond member presence, including call shape, parameter and return assignability, async behavior, properties, attributes, and inheritance.
+Or inspect compatibility without raising:
+
+```python
+result = Storage.check(candidate)
+
+if result:
+    register(candidate)
+
+result.errors()
+result.unknowns()
+result.evidence
+```
+
+Stipulate checks more than member presence: call shape, parameter and return assignability, async behavior, properties, attributes, and inheritance all contribute to compatibility.
 
 Validation returns the original object when successful.
 
-### Evolve
+## Evolve
 
 ```python
-report = compare_interfaces(StorageV1, StorageV2)
+report = StorageV1.compare(StorageV2)
 ```
 
-Stipulate's contract engine is designed to analyze interface evolution using the same compatibility rules as runtime validation. This enables directional implementer/consumer compatibility, semantic change reports, and future CI contract checks.
+The same compatibility engine used for runtime validation is designed to analyze interface evolution, including separate effects on implementers and consumers.
 
-## Contract engine
-
-Stipulate's core model is intentionally small:
-
-```text
-compile   Python interface → Contract
-inspect   Contract + object → CompatibilityResult
-validate  enforce a compatibility result
-compare   Contract + Contract → compatibility report
-serialize Contract → schema / fingerprint / snapshot
+```python
+report.breaking
+report.implementers
+report.consumers
+report.changes
 ```
 
-A compatibility result can preserve what Stipulate proved, disproved, or could not determine from available runtime information. Strict validation can reject unknown evidence without pretending that missing annotations were proven incompatible.
+## Contract metadata
+
+Every Stipulate interface exposes its compiled contract:
+
+```python
+Storage.contract
+Storage.schema()
+Storage.fingerprint()
+```
+
+Schemas, fingerprints, snapshots, and future CI tooling all derive from the same contract representation.
+
+## Existing Protocols
+
+Existing Python `Protocol` declarations can opt in without rewriting implementations:
+
+```python
+from typing import Protocol
+from stipulate import Contract
+
+
+class StorageProtocol(Protocol):
+    def read(self, key: str) -> bytes | None: ...
+
+
+Storage = Contract(StorageProtocol)
+
+Storage.validate(candidate)
+Storage.check(candidate)
+Storage.compare(other)
+```
+
+This is the zero-migration adoption path for existing typed codebases.
 
 ## Example failure
 
 ```text
-2 validation errors for Repository
+2 contract errors for Repository
 
 get.id
   Implementation parameter type is too narrow
@@ -86,11 +120,22 @@ save
   [type=async_mismatch]
 ```
 
-Errors are structured so frameworks, CI, tests, and developer tools can consume the same evidence.
+Failures raise `ContractError`. Invalid or unresolvable contract definitions use `ContractDefinitionError`.
 
-## Existing Protocols
+## Public model
 
-Stipulate is designed to work with Python's structural typing ecosystem rather than replace it. Existing `Protocol` declarations should be usable through the contract adapter/compiler without rewriting implementations.
+The intended API stays centered on the contract itself:
+
+```python
+Storage.validate(obj)
+Storage.check(obj)
+Storage.compare(StorageV2)
+Storage.contract
+Storage.schema()
+Storage.fingerprint()
+```
+
+Advanced users can work with `Contract` directly. Free functions may exist internally or as narrowly justified typing fallbacks, but they are not the primary user interface.
 
 ## What Stipulate is not
 
@@ -102,8 +147,8 @@ Its focus is structural interface contracts.
 
 - [Product Vision](docs/PRODUCT_VISION.md)
 - [Contract Engine](docs/CONTRACT_ENGINE.md)
+- [Public Interface Model](docs/INTERFACE_MODEL.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Interface Model](docs/INTERFACE_MODEL.md)
 - [Type System and Assignability](docs/TYPE_SYSTEM.md)
 - [Validation Engine](docs/VALIDATION_ENGINE.md)
 - [Static Typing Strategy](docs/STATIC_TYPING.md)
@@ -121,4 +166,4 @@ The [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md) register is the a
 
 ## Status
 
-Stipulate is in design/prototype stage. The current prototype has exercised the `class Foo(Interface):` model, variance-aware runtime validation, structured compatibility evidence, contract serialization/fingerprints, and directional interface comparison.
+Stipulate is in design/prototype stage. The prototype has exercised the `class Foo(Interface):` model, variance-aware runtime validation, structured compatibility evidence, contract serialization/fingerprints, and directional interface comparison.
