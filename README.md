@@ -88,8 +88,12 @@ Stipulate fills that gap while composing with Python's typing system instead of 
 - [Performance and Caching](docs/PERFORMANCE.md)
 - [Testing Strategy](docs/TESTING_STRATEGY.md)
 - [Compatibility Policy](docs/COMPATIBILITY.md)
+- [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
+- [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
+
+The [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md) register is the authoritative backlog for unresolved correctness and compatibility questions. New implementation work that changes Stipulate's semantics should either resolve an existing OTP item or add one before the behavior is treated as designed.
 
 ## Initial scope
 
