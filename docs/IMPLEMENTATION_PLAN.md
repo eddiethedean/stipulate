@@ -6,23 +6,44 @@ Turn the validated prototype into a maintainable production package without losi
 
 The authoritative unresolved-engineering backlog is [OPEN_TECHNICAL_PROBLEMS.md](OPEN_TECHNICAL_PROBLEMS.md). Implementation work must map semantic changes to OTP items and satisfy their acceptance criteria before those problems are considered resolved.
 
+## Non-negotiable project invariant: Pyright strict
+
+Stipulate is **Pyright strict from the first implementation commit onward**.
+
+The repository must configure:
+
+```json
+{
+  "typeCheckingMode": "strict"
+}
+```
+
+or the equivalent `pyproject.toml` setting.
+
+A change is not merge-ready if first-party code fails Pyright strict.
+
+Do not defer typing cleanup to later milestones. Dynamic runtime behavior must be isolated behind small normalization boundaries rather than allowing `Any` to spread through the contract engine.
+
+Broad ignores, disabled strict diagnostics, or file-wide checker suppressions are not acceptable substitutes for design work. Narrow suppressions are permitted only for genuine checker limitations and must be documented.
+
 ## Milestone 1 — Package foundation
 
-Create the package skeleton:
+Create the package skeleton around the contract engine:
 
 ```text
-stipulate/
+src/stipulate/
     __init__.py
     _interface.py
+    _contract.py
     _compile.py
     _members.py
     _signatures.py
     _assignability.py
     _annotations.py
+    _compatibility.py
+    _evidence.py
     _errors.py
     _cache.py
-    adapter.py
-    config.py
 
 tests/
 typing_tests/
@@ -32,18 +53,19 @@ benchmarks/
 Add:
 
 - `pyproject.toml`;
+- Pyright with `typeCheckingMode = "strict"`;
 - pytest;
-- mypy test dependency;
-- Pyright test dependency/tooling;
+- mypy interoperability fixtures;
 - Ruff or equivalent linting;
 - coverage;
-- CI across supported Python versions.
+- CI across supported Python versions;
+- Hypothesis for property-based compatibility tests when the first assignability engine lands.
 
-Also establish the first explicit support matrix for OTP-025.
+Pyright strict must pass before Milestone 1 is considered complete.
 
 ## Milestone 2 — Interface bridge
 
-Implement and freeze the smallest possible runtime bridge that supports:
+Implement and freeze the smallest possible runtime bridge supporting:
 
 ```python
 class Foo(Interface):
@@ -53,46 +75,53 @@ class Foo(Interface):
 Requirements:
 
 - `Foo` is a genuine runtime protocol;
-- Stipulate framework methods do not become protocol members;
-- interface inheritance remains valid;
-- normal static structural typing works under mypy and Pyright;
+- framework methods do not become protocol members;
+- inheritance remains valid;
+- ordinary static structural typing works;
+- the bridge and its stubs/typing representation pass Pyright strict;
 - behavior is regression-tested across every supported Python version.
 
-This milestone is a release blocker because the rest of the public API depends on it.
+The desired method-first API must remain an explicit typing design target:
 
-Primary OTP: OTP-001. Preserve OTP-002 as a documented limitation unless Python typing capabilities change.
+```python
+Foo.validate(obj)
+Foo.check(obj)
+Foo.compare(FooV2)
+```
 
-## Milestone 3 — Compiled model
+Do not normalize checker errors around these methods with blanket ignores.
 
-Implement:
+## Milestone 3 — Contract IR
 
-- `CompiledInterface`;
-- compiled member record types;
+Implement the immutable semantic core:
+
+- `Contract`;
+- typed contract member records;
+- normalized callable/signature model;
+- normalized type-expression representation where needed;
 - inherited member collection;
-- method/property/attribute classification;
-- signature normalization;
 - annotation resolution;
-- weak-reference cache.
+- canonical serialization foundation;
+- weak-reference compilation cache.
 
-The compiler should contain no candidate-specific state.
+The compiler contains no candidate-specific validation state.
 
-Primary OTPs: OTP-005, OTP-012, OTP-021.
+All IR types should be precise enough to keep the compatibility engine free of pervasive `Any`.
 
-## Milestone 4 — Error foundation
+## Milestone 4 — Evidence and errors
 
-Implement `InterfaceValidationError` and structured records before expanding validation logic.
+Implement structured evidence and result models before expanding validation logic:
 
-Also define a distinct path for interface-definition/compilation failures so malformed or unresolved interfaces are not reported as ordinary candidate mismatches.
+- `Evidence`;
+- `CompatibilityResult`;
+- `ContractError`;
+- `ContractDefinitionError`.
 
-Stable initial error codes should be used throughout tests from this point onward.
+Distinguish proven, incompatible, and unknown evidence explicitly.
 
-Primary OTPs: OTP-013 and OTP-022.
+## Milestone 5 — Callable compatibility
 
-## Milestone 5 — Callable validation
-
-Implement call-shape compatibility independently from type assignability.
-
-Order:
+Implement call-shape compatibility independently from type assignability:
 
 1. positional-only;
 2. positional-or-keyword;
@@ -101,197 +130,140 @@ Order:
 5. extra required parameters;
 6. `*args`;
 7. `**kwargs`;
-8. method binding normalization;
+8. binding normalization;
 9. async mismatch detection;
 10. decorator/signature recovery policy.
 
-Build specification-oriented fixtures before adding advanced annotations.
+Build specification-oriented fixtures before advanced annotations.
 
-Primary OTPs: OTP-003, OTP-015, OTP-016.
+## Milestone 6 — Assignability engine
 
-## Milestone 6 — Core assignability
-
-Implement a dedicated assignability engine with explicit direction:
+Implement directional assignability explicitly:
 
 ```python
 is_assignable(source, destination, context=...)
 ```
 
-Avoid ambiguous helpers named simply `compatible()`.
-
 Initial cases:
 
 - identity;
-- `Any`;
-- missing annotations under strict/permissive policy;
+- `Any` with deliberate policy;
+- missing annotations under strict/permissive evidence rules;
 - `None`;
-- normal subclass relationships;
+- nominal subclass relationships;
 - unions;
 - `Literal`;
 - `Annotated` underlying type;
 - common generic forms with known variance.
 
-Use this engine contravariantly for callable parameters and covariantly for returns.
+Use parameter contravariance and return covariance correctly.
 
-Unsupported constructs must produce explicit diagnostics rather than fall back to equality.
-
-Primary OTPs: OTP-004 and OTP-010.
+Unsupported constructs produce explicit unknown/unsupported evidence rather than equality fallback.
 
 ## Milestone 7 — Attributes and properties
 
-Implement separate representations for:
+Implement separate semantic representations for readable/writable attributes and properties.
 
-- readable attributes;
-- writable attributes;
-- read-only properties;
-- writable properties.
+Do not infer declaration compatibility solely from a current runtime value.
 
-Do not infer full declaration compatibility solely from the current runtime value.
+Define policy for custom descriptors, dynamic members, and instance-only attributes.
 
-Define the 0.1 policy for custom descriptors, dynamic members, and instance-only attributes even if richer support is deferred.
+## Milestone 8 — Method-first public API
 
-Primary OTPs: OTP-011, OTP-012, OTP-014.
-
-## Milestone 8 — Public APIs
-
-Implement:
+Implement the intended public experience:
 
 ```python
-validate(interface, value, *, strict=False)
-InterfaceAdapter(interface, ...)
-InterfaceValidationError
+Foo.validate(value)
+Foo.check(value)
+Foo.compare(FooV2)
+Foo.contract
+Foo.schema()
+Foo.fingerprint()
 ```
 
-Then add runtime convenience APIs:
+Existing Protocols use:
 
 ```python
-Foo.model_validate(value)
-Foo.interface_schema()
+contract = Contract(MyProtocol)
+contract.validate(value)
 ```
 
-Document the class-side typing limitation clearly. Do not treat the shape returned by `interface_schema()` as a stable public schema until OTP-023 is resolved.
-
-Primary OTPs: OTP-002 and OTP-023.
+The method-first API is the design target. If Python typing limitations require a stub or narrowly scoped fallback mechanism, solve that explicitly without weakening repository-wide Pyright strict mode.
 
 ## Milestone 9 — Checker conformance
 
-Create source fixtures executed by both mypy and Pyright.
+Create fixtures executed by Pyright strict and mypy.
 
-Must verify:
+Verify:
 
 - structural implementation acceptance;
-- invalid implementation rejection where statically knowable;
-- inferred return type from `validate()`;
-- adapter typing;
+- statically invalid implementations rejected;
+- method-first API typing;
+- precise validation return types;
+- `Contract(Protocol)` typing;
 - interface inheritance;
-- generic behavior only when actually supported.
+- generic behavior only when actually supported;
+- no accidental public `Any` leakage.
 
-Record intentional checker disagreements according to OTP-010 rather than forcing accidental parity.
+Pyright strict is mandatory. Mypy is an interoperability target, not a reason to weaken strict Pyright design.
 
 ## Milestone 10 — Hardening
 
 Before the first public beta:
 
-- fuzz/property tests around signature shape;
+- Hypothesis/property tests around signature shape and assignability invariants;
 - decorator/wrapper tests;
 - dynamic attribute tests;
 - forward-reference tests;
-- multi-error aggregation tests;
-- weak-cache lifecycle tests;
-- thread-safety tests;
+- multi-evidence aggregation tests;
+- cache lifecycle/thread-safety tests;
 - mutation/cache policy tests;
 - benchmark baseline;
-- documentation examples executed as tests where practical.
+- documentation examples executed and type-checked where practical.
 
-Primary OTPs: OTP-020, OTP-021, OTP-024, plus unresolved 0.1 blockers.
+## Later milestones
 
-## Milestone 11 — Generic correctness
+After the ordinary core is trustworthy:
 
-Do not begin broad generic support until the 0.1 core is trustworthy.
-
-Implement:
-
-- `TypeVar` specialization and coherent binding environments;
-- bounded and constrained variables;
-- inherited generic interfaces;
-- explicit covariance and contravariance;
-- Python 3.12+ inferred variance where runtime metadata is sufficient.
-
-Primary OTPs: OTP-006 and OTP-007.
-
-## Milestone 12 — Advanced callable typing
-
-Only after spec-driven designs and fixtures exist, consider:
-
-- overload sets;
-- `ParamSpec`;
-- `Concatenate`;
-- `Self`;
-- `TypeVarTuple`;
-- `Unpack`;
-- typed `**kwargs`;
-- nested protocol semantics;
-- expanded async/generator semantics.
-
-Primary OTPs: OTP-008, OTP-009, OTP-016, OTP-017, OTP-018, OTP-019.
+- generic specialization and variance;
+- overloads and advanced callable typing;
+- canonical schemas and fingerprints;
+- semantic interface evolution;
+- snapshot/CI tooling;
+- optional CLI via Typer/Rich;
+- optional post-1.0 Pydantic integration;
+- optional native/Rust core only if benchmarks justify it.
 
 ## Implementation rules
 
+### Pyright strict forever
+
+Strict mode is permanent project policy across new modules, refactors, CLI code, optional integrations, and future releases.
+
 ### Do not use annotation equality as a fallback
 
-If a typing construct is unsupported, return an unsupported diagnostic rather than pretending equality implements assignability.
+Unsupported typing constructs must remain explicit.
 
-### Do not call candidate methods during validation
+### Do not call candidate methods during structural validation
 
-Validation is structural/introspective.
-
-### Keep internals typed
-
-Stipulate itself should run under strict static type checking. A package about interface typing should model high typing quality internally.
+Validation is introspective unless a future explicitly separate behavioral feature says otherwise.
 
 ### Minimize private `typing` coupling
 
-Isolate compatibility code that interacts with CPython-specific runtime protocol behavior.
+Isolate CPython/runtime Protocol internals behind a small typed compatibility layer.
 
 ### Prefer immutable compiled metadata
 
-Compiled contracts should be safe to share between threads and validation calls.
+Contracts should be safe to cache and share.
 
 ### Treat open technical problems as release gates
 
-A feature is not complete merely because a happy-path implementation exists. If it maps to an OTP item, its specified acceptance tests and policy questions must be resolved before support is advertised.
-
-### Preserve unsupported behavior explicitly
-
-If an advanced form is not yet implemented, tests should assert the unsupported diagnostic so a later refactor cannot accidentally begin accepting it without design review.
+Happy-path code is not enough.
 
 ## Definition of done for 0.1
 
-A 0.1 release should be able to demonstrate:
+A 0.1 release must demonstrate the core contract experience while the repository passes Pyright strict with zero first-party errors.
 
-```python
-class Repository(Interface):
-    def get(self, id: int) -> User | None: ...
-    async def save(self, user: User) -> None: ...
-```
+It should support ordinary interfaces with correct structural recognition, runtime validation, variance-aware callable checks, async checks, attributes/properties for documented cases, structured evidence/errors, cached compilation, explicit unsupported diagnostics, and supported Python versions proven in CI.
 
-with:
-
-- unrelated structural implementations recognized by mypy and Pyright;
-- valid implementations accepted at runtime;
-- bad parameter variance rejected;
-- bad return variance rejected;
-- bad signature shape rejected;
-- async mismatch rejected;
-- common forward references resolved or diagnosed clearly;
-- properties/attributes validated for the documented scope;
-- definition errors separated from candidate errors;
-- useful aggregated errors;
-- warm validation using cached compilation;
-- explicit diagnostics for unsupported constructs;
-- documented mutation/cache behavior;
-- supported Python versions proven in CI.
-
-Every OTP listed as a 0.1 release gate in `OPEN_TECHNICAL_PROBLEMS.md` must be resolved or have an intentionally frozen, documented policy before 0.1 is declared ready.
-
-Do not expand the public feature set until this base is trustworthy.
+Do not expand the feature set until this base is trustworthy.
