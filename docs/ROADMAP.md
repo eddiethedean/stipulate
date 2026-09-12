@@ -34,7 +34,16 @@ Primary OTPs: OTP-001, OTP-003, OTP-004, OTP-010, OTP-012, OTP-021.
 
 ## Phase 1 — Minimal usable core
 
-Target: first installable package suitable for experimentation.
+Target: first installable package suitable for experimentation and dynamic-boundary validation.
+
+Primary user story:
+
+```python
+plugin = load_plugin(...)
+plugin = validate(PluginInterface, plugin)
+```
+
+The package should already provide a compelling reason to exist at plugin, dependency-injection, backend, driver, mock, and third-party implementation boundaries where static proof is unavailable.
 
 Deliverables:
 
@@ -54,7 +63,7 @@ Deliverables:
 - weak-reference compilation cache;
 - pytest suite;
 - mypy/Pyright fixtures;
-- documentation examples;
+- documentation examples centered on dynamic boundaries;
 - explicit Python support matrix.
 
 Gate: no advertised feature without positive, negative, error, checker, and version tests. Every 0.1-blocking OTP must either be resolved or have a deliberately frozen and documented policy.
@@ -141,11 +150,48 @@ Potential uses:
 - dependency injection;
 - mock/fake verification;
 - framework extension APIs;
-- generated developer documentation.
+- generated developer documentation;
+- contract visualization and manifests.
 
 Primary OTP: OTP-023. OTP-002 may be revisited if Python typing capabilities improve.
 
-## Phase 6 — 1.0 hardening
+## Phase 6 — Interface compatibility analysis
+
+Target: turn the proven assignability engine into tooling for contract evolution.
+
+Potential API:
+
+```python
+compare_interfaces(ApiV1, ApiV2)
+```
+
+The analysis should distinguish breaking and non-breaking changes according to the same compatibility semantics used by validation.
+
+Candidate capabilities:
+
+- added/removed members;
+- parameter widening/narrowing;
+- return widening/narrowing;
+- added optional versus required parameters;
+- positional/keyword compatibility changes;
+- async/sync changes;
+- attribute/property mutability changes;
+- inherited contract changes;
+- generic contract changes once generic semantics are proven.
+
+Potential uses:
+
+- semantic-versioning checks for framework extension APIs;
+- plugin compatibility CI;
+- migration reports;
+- release tooling;
+- interface-version documentation.
+
+Gate: this phase must reuse the validated core semantics. Do not build a second independent compatibility algorithm for diffing.
+
+This phase may move earlier or later depending on user demand, but it should not precede trustworthy assignability and schema representations.
+
+## Phase 7 — 1.0 hardening
 
 Requirements before 1.0:
 
@@ -171,11 +217,10 @@ These are intentionally not commitments:
 - class-level preflight validation for plugin registration;
 - framework adapters;
 - richer IDE/checker integration;
-- protocol diffing/version compatibility;
-- contract compatibility reports between interface versions;
 - generated test doubles;
-- validation hooks for dependency injection containers.
+- validation hooks for dependency injection containers;
+- optional optimized core if profiling demonstrates a meaningful need.
 
 ## Guiding rule
 
-Stipulate should expand by making more Python typing semantics correct, not by accumulating convenience features faster than the validation engine can support them safely.
+Stipulate should expand by making more Python typing semantics correct and by extracting tooling value from the same trustworthy compiled contract model—not by accumulating unrelated convenience features faster than the validation engine can support them safely.
