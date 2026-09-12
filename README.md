@@ -88,6 +88,7 @@ Stipulate fills that gap while composing with Python's typing system instead of 
 - [Performance and Caching](docs/PERFORMANCE.md)
 - [Testing Strategy](docs/TESTING_STRATEGY.md)
 - [Compatibility Policy](docs/COMPATIBILITY.md)
+- [Competition Evaluation](docs/COMPETITION.md)
 - [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
