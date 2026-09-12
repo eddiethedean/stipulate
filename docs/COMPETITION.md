@@ -2,48 +2,49 @@
 
 ## Purpose
 
-Stipulate occupies the intersection of Python structural typing, runtime type validation, and interface contracts. This document evaluates the projects and standards most relevant to that position.
+Stipulate is no longer scoped as only a runtime Protocol validator. Its intended category is a **contract engine for Python structural interfaces**.
 
-The goal is not to copy competitors feature-for-feature. Stipulate should use the Python typing specification as its correctness baseline, established type checkers as interoperability targets, and mature validation libraries as quality benchmarks.
+The engine compiles explicit structural contracts, validates dynamic implementations, preserves evidence about what can and cannot be proven, and uses the same directional compatibility semantics to reason about interface evolution.
+
+This changes the competitive set. Runtime type checkers remain relevant, but API compatibility and contract-evolution tools are now equally important adjacent systems.
 
 ## Stipulate's intended position
 
-Stipulate answers a specific question:
+Stipulate aims to own this combination:
 
-> Does this object safely implement this structural interface?
+> **Standard Python structural typing + deep runtime interface assignability + evidence-backed compatibility + semantic interface evolution.**
 
-The intended experience is:
+The core semantic question is:
 
-```python
-from stipulate import Interface, validate
-
-
-class Repository(Interface):
-    def get(self, id: int) -> User | None: ...
-    async def save(self, user: User) -> None: ...
-
-
-repo = validate(Repository, candidate)
+```text
+provided contract <= required contract
 ```
 
-The same interface should remain useful to ordinary Python static type checking.
+Public capabilities can then share one engine:
 
-Stipulate is therefore not primarily a general-purpose runtime type checker and should not attempt to compete by supporting arbitrary annotations in every possible runtime context before its interface-validation semantics are correct.
+```python
+validate(Storage, candidate)
+inspect_contract(Storage, candidate)
+compare_interfaces(StorageV1, StorageV2)
+compile_contract(Storage).schema()
+compile_contract(Storage).fingerprint()
+```
 
-## Evaluation criteria
+## Strategic differentiation
 
-Relevant alternatives are evaluated against these capabilities:
+Stipulate should not win by supporting the largest number of arbitrary annotations, extracting the largest Python API graph, or performing the most call-site analytics.
 
-1. standard Python structural typing interoperability;
-2. deep runtime validation of complete interfaces;
-3. callable assignability rather than signature equality;
-4. attributes, properties, methods, and async methods;
-5. generic and advanced typing semantics;
-6. structured diagnostics;
-7. compiled/cached validation;
-8. schema or machine-readable contract metadata;
-9. adoption cost for existing Python code;
-10. maturity and ecosystem significance.
+It should win by making **explicit Python structural contracts** a first-class semantic object and making one compatibility relation useful across runtime validation, explanation, schemas, CI, and evolution.
+
+Particularly important differentiators are:
+
+- implementations do not need Stipulate inheritance, registration, or decorators;
+- interfaces remain useful to normal static type checkers;
+- compatibility is directional and based on assignability, not textual equality;
+- unknown runtime evidence is preserved rather than silently converted to success/failure;
+- implementer and consumer compatibility can be analyzed separately during evolution;
+- schemas, snapshots, and fingerprints derive from canonical contract IR;
+- runtime validation and interface evolution use the same semantic engine.
 
 ---
 
@@ -51,31 +52,26 @@ Relevant alternatives are evaluated against these capabilities:
 
 ### Role
 
-`typing.Protocol` is not merely competition. It is the language-level foundation Stipulate is designed to extend at runtime.
+`typing.Protocol` is the language-level foundation rather than merely a competitor.
 
 ### Strengths
 
 - standardized structural typing;
 - understood by mypy, Pyright, Pylance, IDEs, and typing-aware libraries;
-- supports protocol inheritance and generic protocols;
-- no third-party dependency;
-- defines the user expectation for structural substitutability.
+- supports inheritance and generic protocols;
+- no third-party dependency.
 
-### Runtime gap
+### Gap
 
-`@runtime_checkable` primarily provides member-presence checks. It does not deeply establish that callable signatures, annotations, async behavior, properties, and related interface semantics are compatible.
+Static checking naturally ends at dynamic loading/configuration boundaries, and `@runtime_checkable` provides much shallower runtime guarantees than Stipulate intends.
+
+Protocol also does not provide a canonical contract artifact, evidence model, schema/fingerprint lifecycle, or semantic interface-evolution tooling.
 
 ### Stipulate strategy
 
-Do not replace Protocol semantics. Compose with them.
+Compose with Protocol semantics rather than replacing them.
 
-Stipulate interfaces should remain useful as ordinary structural types while adding a deeper runtime contract layer.
-
-### Competitive importance
-
-**Critical.**
-
-The primary adoption question is not whether Stipulate is better than Protocol. It is whether Stipulate adds enough runtime value while preserving Protocol's static value.
+**Competitive importance: Critical foundation.**
 
 ---
 
@@ -83,44 +79,99 @@ The primary adoption question is not whether Stipulate is better than Protocol. 
 
 ### Role
 
-Pydantic is not a direct interface-validation competitor. It is Stipulate's most important developer-experience benchmark.
+Pydantic is Stipulate's primary developer-experience benchmark rather than a direct contract-engine competitor.
 
-Pydantic demonstrates what Python developers increasingly expect from a serious validation system:
+### Lessons
 
-- declarative models;
-- a clear validation entry point;
-- compiled validation machinery;
-- predictable behavior;
-- structured errors;
-- adapters;
-- schema generation;
-- excellent introspection and tooling ergonomics.
+- declarative models can become infrastructure;
+- compiled representations matter;
+- structured errors are more valuable than booleans;
+- adapters ease adoption;
+- schemas turn models into tooling artifacts;
+- predictable semantics and excellent documentation create ecosystem trust.
 
 ### Difference
 
-Pydantic primarily validates data/value structures. Stipulate validates behavioral/object contracts.
-
-Conceptually:
-
-```python
-User.model_validate(data)
-```
-
-corresponds to:
-
-```python
-validate(Repository, candidate)
-```
+Pydantic primarily validates data/value structures. Stipulate validates and compares structural capability contracts.
 
 ### Stipulate strategy
 
-Treat Pydantic as the UX quality bar, not as an implementation dependency or type-system authority.
+Match the quality bar for errors, adapters, compilation, schemas, and ergonomics without imitating data-validation semantics where they do not apply.
 
-Stipulate should aspire to similarly useful errors, adapters, compiled metadata, stable APIs, and documentation while retaining semantics appropriate for interfaces.
+**Competitive importance: Critical UX benchmark.**
 
-### Competitive importance
+---
 
-**Critical UX benchmark.**
+## Griffe
+
+### Role
+
+Griffe is the most important established adjacent competitor for the interface-evolution/tooling side of Stipulate.
+
+It builds rich representations of Python package APIs and supports serialization and breaking-change analysis between versions.
+
+### Overlap
+
+- Python API modeling;
+- signatures and annotations;
+- serialized representations;
+- breaking-change detection;
+- CI/release tooling;
+- API evolution analysis.
+
+### Fundamental difference
+
+Griffe begins from a Python package's public source/API surface and asks what changed.
+
+Stipulate begins from an **explicit structural requirement contract** and asks what may safely satisfy it.
+
+Stipulate therefore has a natural runtime operation that package API extraction does not replace:
+
+```python
+inspect_contract(Storage, dynamically_loaded_plugin)
+```
+
+and its evolution semantics can be defined through the same relation used for implementation validation.
+
+### Stipulate strategy
+
+Do not compete with Griffe on whole-package source extraction, docstring modeling, or general API documentation graphs.
+
+Specialize the IR around structural contract semantics and make assignability/evidence deeper.
+
+**Competitive importance: High established adjacent competitor.**
+
+---
+
+## ImpactGuard
+
+### Role
+
+ImpactGuard is a close adjacent project on API-change CI and evolution tooling.
+
+Its product direction includes API snapshots, semantic change classification, CI enforcement, risk analysis, SemVer recommendations, and call-site/runtime impact information.
+
+### Overlap
+
+- snapshots/baselines;
+- breaking-change detection;
+- CI gating;
+- compatibility reports;
+- release/SemVer advice.
+
+### Fundamental difference
+
+Impact-style tools analyze inferred code APIs and their usage/exposure.
+
+Stipulate's semantic object is an explicit structural contract. It should not need call-site analytics to establish whether one contract is assignable to another.
+
+Stipulate also combines evolution analysis with runtime implementation conformance.
+
+### Stipulate strategy
+
+Do not compete on whole-code impact/risk analytics. Make contract semantics, directionality, evidence, and Protocol interoperability stronger.
+
+**Competitive importance: Medium-to-high emerging adjacent competitor.**
 
 ---
 
@@ -128,35 +179,24 @@ Stipulate should aspire to similarly useful errors, adapters, compiled metadata,
 
 ### Role
 
-Typeguard is an established runtime type-checking library and a serious adjacent competitor.
+Established runtime type checking.
 
-Its core purpose is runtime enforcement of type annotations on values, arguments, return values, generators, and related execution boundaries.
+### Overlap
 
-### Strengths
+- runtime annotations;
+- Protocol awareness;
+- annotation resolution;
+- difficult Python runtime typing edge cases.
 
-- mature runtime type-checking ecosystem;
-- broad annotation support;
-- instrumentation and decorator workflows;
-- existing awareness of Protocol types;
-- useful prior art for annotation resolution and difficult runtime typing cases.
+### Difference
 
-### Difference from Stipulate
-
-Typeguard's primary abstraction is runtime checking of values against type annotations.
-
-Stipulate's primary abstraction is compilation and validation of an entire structural object contract.
-
-Stipulate must reason about relationships among interface members and candidate members, including callable parameter direction, return direction, call shape, member kinds, inheritance, and eventually generic bindings.
+Typeguard primarily checks values crossing runtime function/type boundaries. Stipulate compiles and reasons about a complete interface contract and its evolution.
 
 ### Stipulate strategy
 
-Study Typeguard's behavior for annotation handling, forward references, decorators, unsupported constructs, and runtime edge cases.
+Study annotation/runtime edge cases; do not become a function-instrumentation system.
 
-Do not turn Stipulate into a competing function-instrumentation system.
-
-### Competitive importance
-
-**High adjacent relevance.**
+**Competitive importance: High adjacent runtime-typing relevance.**
 
 ---
 
@@ -164,65 +204,122 @@ Do not turn Stipulate into a competing function-instrumentation system.
 
 ### Role
 
-Beartype is a mature, broad runtime type-checking system with extensive support for Python type hints.
+Mature broad runtime type checking.
 
-### Strengths
+### Overlap
 
-- broad runtime typing support;
-- mature optimization work;
-- sophisticated annotation handling;
-- decorators and lower-level checking APIs;
-- substantial implementation experience around difficult Python typing constructs.
+- runtime type-hint semantics;
+- annotation normalization;
+- performance/caching problems;
+- Protocol-aware typing behavior.
 
-### Difference from Stipulate
+### Difference
 
-Beartype is fundamentally broader. Its mission is runtime type checking across Python annotations.
-
-Stipulate should specialize in interface contracts and make that specialization materially better than treating an interface as just another runtime type hint.
+Beartype is intentionally broad. Stipulate's value comes from specializing in complete structural contracts and using them beyond one runtime type check.
 
 ### Stipulate strategy
 
-Do not compete on total number of supported arbitrary type hints or decorator instrumentation.
+Do not compete on annotation count or decorator instrumentation. Study implementation techniques and potentially evaluate narrow optional delegation only if semantics remain Stipulate-owned.
 
-Study Beartype for performance techniques, annotation normalization, caching, and runtime typing edge cases.
-
-Potential future integration or optional delegation of narrow low-level type operations may be investigated only if it does not compromise Stipulate's semantics or dependency profile.
-
-### Competitive importance
-
-**High adjacent relevance; not the product model to copy.**
+**Competitive importance: High adjacent runtime-typing relevance.**
 
 ---
 
-## zope.interface
+## `zope.interface`
 
 ### Role
 
-`zope.interface` is important mature prior art for runtime interface systems in Python.
+Mature historical runtime-interface system.
 
-### Strengths
+### Overlap
 
-- long-lived and proven interface ecosystem;
-- explicit interface declarations;
-- runtime verification concepts;
-- adaptation and component-system patterns;
-- extensive real-world use.
+- explicit interfaces;
+- runtime verification;
+- adaptation/component-system lessons;
+- interface metadata.
 
-### Difference from Stipulate
+### Difference
 
-`zope.interface` represents a separate interface system with its own declaration and implementation concepts.
-
-Stipulate deliberately wants to remain grounded in modern Python structural typing so that the same interface declaration remains valuable to existing static tooling without requiring implementations to opt into a separate nominal/component model.
+`zope.interface` is its own interface ecosystem. Stipulate deliberately stays grounded in modern Python structural typing and does not require implementations to opt into a nominal/component model.
 
 ### Stipulate strategy
 
-Study its mature interface-verification concepts, diagnostics, and ecosystem lessons.
+Study mature verification and ecosystem lessons without recreating the separate interface language.
 
-Do not recreate its separate interface language or component architecture.
+**Competitive importance: High historical relevance.**
 
-### Competitive importance
+---
 
-**High historical and architectural relevance.**
+## Design-by-contract libraries (`icontract`, related tools)
+
+### Role
+
+These libraries use the word "contract" for runtime behavioral conditions such as preconditions, postconditions, and invariants.
+
+### Difference
+
+Stipulate contracts are primarily **structural capability contracts**.
+
+```text
+Stipulate:
+    Can this implementation safely satisfy this interface?
+
+Design by Contract:
+    Does this execution satisfy behavioral predicates?
+```
+
+Both concepts can coexist in one application.
+
+### Stipulate strategy
+
+Use precise terminology in documentation and avoid claiming behavioral correctness Stipulate does not execute/prove.
+
+**Competitive importance: Terminology-adjacent, not direct.**
+
+---
+
+## Buf, oasdiff, and schema compatibility tools
+
+### Role
+
+These are conceptual analogues from Protobuf/OpenAPI ecosystems.
+
+They demonstrate the value of treating contracts as versioned semantic artifacts and rejecting breaking changes in CI.
+
+### Relevance
+
+A future:
+
+```text
+stipulate snapshot
+stipulate check
+```
+
+should follow the same philosophy: compare semantic contracts, not source text.
+
+### Difference
+
+Stipulate applies this lifecycle to native Python structural interfaces and can additionally validate live runtime implementations.
+
+**Competitive importance: Strong conceptual validation, different ecosystem.**
+
+---
+
+## `cargo-semver-checks` and typed-language API compatibility tools
+
+### Role
+
+These demonstrate that mature typed ecosystems benefit from semantic API compatibility tooling tied to their type systems.
+
+### Relevance
+
+Stipulate can provide a Python structural-interface analogue, especially for plugin/framework APIs.
+
+### Difference
+
+Python's runtime dynamism and structural Protocol model require an evidence-aware contract system rather than simply reproducing Rust's public API rules.
+
+**Competitive importance: Conceptual analogue.**
 
 ---
 
@@ -230,150 +327,84 @@ Do not recreate its separate interface language or component architecture.
 
 ### Role
 
-Mypy and Pyright are not runtime competitors. They are interoperability targets and behavioral references.
-
-### Why they matter
-
-A major Stipulate selling point is that interfaces remain useful to the type checkers developers already use.
-
-Stipulate should maintain explicit conformance fixtures for both tools.
+Interoperability targets and behavioral references, not runtime competitors.
 
 ### Stipulate strategy
 
 - no checker plugin required for the core structural-typing experience;
-- record intentional disagreements;
-- follow the Python typing specification as semantic authority when checker behavior differs;
-- do not claim checker support for runtime-only conveniences such as class-side APIs unless actually verified.
+- maintain checker conformance fixtures;
+- follow the Python typing specification as semantic authority when checkers differ;
+- document runtime-only APIs honestly.
 
-### Competitive importance
-
-**Critical interoperability targets.**
+**Competitive importance: Critical interoperability targets.**
 
 ---
 
-## TypedProtocol
+## TypedProtocol and small interface-validation packages
 
 ### Role
 
-TypedProtocol is relevant prior art showing that other developers have identified the gap between Protocol structural typing and deeper runtime signature validation.
+Prior art demonstrating interest in deeper runtime Protocol checking.
 
 ### Assessment
 
-It overlaps with part of Stipulate's problem statement, including runtime structural validation and method signature/type checking.
-
-However, it is not currently treated as a strategic competitor or roadmap baseline. Stipulate should not distort its architecture or release priorities around matching a small early-stage project feature-for-feature.
-
-### Useful lesson
-
-Its existence means Stipulate should avoid unsupported marketing claims such as being the first Python project ever to combine protocols and runtime validation.
+They overlap with Stipulate's original validator-only concept but are not currently strategic baselines for the expanded contract-engine architecture.
 
 ### Stipulate strategy
 
-Track as prior art. Reevaluate if ecosystem adoption or technical scope changes materially.
+Track for completeness. Do not distort architecture or roadmap around feature-for-feature competition unless adoption or scope materially changes.
 
-### Competitive importance
-
-**Low strategic importance; relevant prior art.**
-
----
-
-## Older interface/enforcement libraries
-
-Projects such as StrictProtocol, `implements`, `python-interface`, ABC-based enforcement patterns, and similar libraries demonstrate recurring demand for runtime interface verification.
-
-Common approaches include:
-
-- nominal implementation inheritance;
-- decorators declaring implementation;
-- exact signature comparison;
-- custom interface declaration systems;
-- class-definition-time enforcement.
-
-These are useful historical references but generally do not combine the properties Stipulate is targeting: modern structural typing interoperability, deep assignability semantics, Pydantic-style validation UX, and machine-readable compiled contracts.
-
-They should be tracked as prior art rather than treated as primary strategic competitors unless their scope or adoption changes materially.
+**Competitive importance: Low strategic importance.**
 
 ---
 
 ## Competitive matrix
 
-| Capability | Protocol | Pydantic | Typeguard | Beartype | zope.interface | Stipulate target |
-| --- | --- | --- | --- | --- | --- | --- |
-| Structural interface typing | Excellent | No | Uses typing system | Uses typing system | Different interface model | Excellent |
-| Complete interface runtime validation | Shallow | No | Adjacent/partial | Adjacent | Yes, own model | Core purpose |
-| Callable assignability semantics | Static only | N/A | Not core interface abstraction | General typing focus | Different semantics | Core requirement |
-| Pydantic-style structured errors | No | Excellent | Runtime-check errors | Rich runtime errors | Interface errors | Core requirement |
-| Compiled interface metadata | No | Model-centric | No interface model | Type-hint machinery | Interface metadata | Core requirement |
-| Interface schema/tooling potential | No | JSON Schema | No | No interface schema focus | Own metadata | Planned |
-| Existing checker interoperability | Native | Model typing | Native annotations | Native annotations | Separate model | Required |
-| Generic interface specialization | Static | Generic models | Runtime typing | Broad typing | Own model | Planned rigorous support |
+| Capability | Protocol | Griffe/API diff | Runtime type checkers | Schema compatibility tools | Stipulate target |
+| --- | --- | --- | --- | --- | --- |
+| Native Python structural typing | Excellent | Observes Python APIs | Uses annotations | No | Excellent |
+| Validate live dynamic implementation | Shallow presence | No | Type/value oriented | No | Core |
+| Complete interface contract IR | Static declaration | Rich package/API model | No interface lifecycle | External schema | Core |
+| Assignability-driven member semantics | Static | API-change rules | General typing | Schema-specific | Core |
+| Explicit unknown evidence | No | Not runtime proof model | Varies | Usually deterministic schema | Core |
+| Directional implementer/consumer evolution | Static reasoning only | Breaking API analysis | No | Compatibility modes vary | Core target |
+| Canonical contract schema | No | Serializable API model | No | Yes | Core target |
+| Semantic fingerprint/snapshot | No | Baselines possible | No | Common | Planned |
+| Same engine for runtime + evolution | No | No live object validation | No evolution lifecycle | No Python object validation | Core differentiator |
 
-The table is conceptual rather than a claim that every library has uniform behavior across every Python version and typing construct. Detailed feature claims should be verified before being used in public marketing.
+## Defensible position
 
-## Stipulate's defensible position
+Stipulate should protect this formulation:
 
-Stipulate should aim to own this specific combination:
+> **Compile Python structural interfaces into canonical contracts, validate arbitrary runtime implementations against them with explicit evidence, and use the same directional compatibility engine to evolve those contracts safely.**
 
-> Standard Python structural typing + deep runtime interface assignability + Pydantic-quality validation ergonomics.
-
-No single competitive axis is sufficient by itself.
-
-- Protocol already owns static structural typing.
-- Beartype and Typeguard already own broad runtime typing territory.
-- Pydantic already sets the validation UX standard.
-- zope.interface already demonstrates a mature runtime interface ecosystem.
-
-Stipulate's opportunity is to combine the relevant strengths around **complete structural interface contracts** without forcing developers into a parallel interface language.
+That is more defensible than "better runtime Protocol checking" and more specialized than whole-package API diffing.
 
 ## What Stipulate should not become
 
 Stipulate should not become:
 
 - a replacement static type checker;
+- a whole-package source/documentation model competing with Griffe;
+- a call-site/risk analytics platform competing with ImpactGuard-style tools;
 - a general function instrumentation framework;
-- an arbitrary runtime type-checking library competing on annotation count;
-- a dependency injection framework;
-- a nominal interface system;
-- a wrapper/proxy framework by default;
-- a custom alternative to Python's typing specification.
+- an arbitrary runtime type checker competing on annotation count;
+- a dependency injection or plugin framework;
+- a behavioral pre/postcondition engine;
+- a nominal interface ecosystem;
+- a proxy framework by default.
 
-These boundaries protect the package from expanding into mature markets where its specialization would be lost.
+## Competitive monitoring triggers
 
-## Strategic quality bars
-
-### Correctness
-
-Python's typing specification is the primary semantic authority for assignability.
-
-### Static interoperability
-
-Mypy and Pyright are mandatory compatibility targets for the core API.
-
-### Runtime interface validation
-
-Stipulate should provide materially deeper guarantees than `@runtime_checkable`.
-
-### Developer experience
-
-Pydantic is the benchmark for API clarity, structured diagnostics, adapters, metadata, and documentation quality.
-
-### Runtime typing implementation
-
-Typeguard and Beartype are important sources of lessons around difficult annotation behavior, but Stipulate should remain interface-specialized.
-
-### Runtime interface history
-
-`zope.interface` is important prior art for understanding mature interface systems without dictating Stipulate's declaration model.
-
-## Competitive monitoring
-
-Reevaluate this document before major releases and when any of the following occurs:
+Reevaluate before major releases and when:
 
 - Python materially expands runtime Protocol validation;
 - the typing specification adds runtime-oriented interface semantics;
-- Pydantic adds first-class structural interface validation;
-- Typeguard or Beartype introduces a compiled complete-interface contract abstraction;
-- a dedicated interface-validation package achieves meaningful adoption;
-- checker capabilities make Stipulate's current `Interface` bridge or class-side typing workaround obsolete.
+- Pydantic adds first-class structural contract validation/evolution;
+- Griffe adds explicit structural-contract conformance against live implementations;
+- Typeguard or Beartype adds a compiled interface lifecycle/evolution abstraction;
+- API-diff tools add Protocol-aware directional assignability semantics;
+- a dedicated Python structural contract engine gains meaningful adoption;
+- checker changes obsolete Stipulate's Interface bridge or class-side typing workaround.
 
-Competition should influence priorities when it reveals user expectations or technical lessons, but Stipulate's roadmap should remain driven by correctness and its defined product scope.
+Competition should reveal user expectations and useful implementation lessons, but Stipulate's roadmap should remain driven by correctness of its contract relation.
