@@ -1,8 +1,10 @@
 # Stipulate
 
-**Runtime structural interface validation for Python, designed to feel like Pydantic.**
+**Enforceable runtime contracts for Python structural interfaces.**
 
-Stipulate lets developers define behavioral contracts with normal Python class syntax, keep those contracts useful to existing static type checkers, and validate implementations deeply at runtime.
+Stipulate lets developers define behavioral contracts with normal Python class syntax, keep those contracts useful to existing static type checkers, and validate dynamic implementations deeply at runtime.
+
+> **Define an interface once. Use it with the type checker you already have. Validate implementations where static typing ends.**
 
 ```python
 from stipulate import Interface, validate
@@ -25,7 +27,24 @@ class PostgresRepository:
 repo = validate(Repository, PostgresRepository())
 ```
 
-The goal is to provide for object interfaces what Pydantic provides for JSON-shaped data: a declarative model, a compiled validation engine, structured errors, predictable semantics, and strong developer ergonomics.
+The goal is to provide for object interfaces what Pydantic provides for data validation: a declarative model, a compiled validation engine, structured errors, predictable semantics, and strong developer ergonomics.
+
+## Why Stipulate?
+
+Static type checking works when the checker can see the relationship between an implementation and an interface. Real applications also receive objects dynamically through plugins, dependency injection, configuration, entry points, drivers, backends, mocks, and third-party extension APIs.
+
+At that boundary, Stipulate answers a stronger question than shallow runtime Protocol checks:
+
+> **Can this object actually be used safely according to this interface contract?**
+
+Stipulate is built around four promises:
+
+1. **Use the type system you already have.** Interfaces remain structural Python types useful to mypy, Pyright, Pylance, IDEs, and ordinary annotations.
+2. **Validate where static typing ends.** Dynamically obtained implementations can be verified before the application depends on them.
+3. **Validate compatibility, not appearance.** Callable variance, call shape, async semantics, properties, attributes, and inheritance matter—not merely member names or textual signature equality.
+4. **Turn interfaces into tooling artifacts.** Compiled contracts and structured errors establish a foundation for schemas, documentation, plugin tooling, and future interface compatibility analysis.
+
+Implementations remain ordinary Python classes. They should not need to inherit from Stipulate, register themselves, use decorators, or depend on Stipulate.
 
 ## Core promise
 
@@ -58,11 +77,46 @@ handler = Handler.model_validate(candidate)
 
 Because current Python typing cannot fully express the class-side metaclass API while also treating `Interface` as the special `Protocol` base through a single alias, `validate(Handler, candidate)` is the statically authoritative API. `Handler.model_validate(...)` is runtime convenience unless typing support improves.
 
-## Why Stipulate exists
+## Where it fits
 
-Python's `typing.Protocol` is excellent for static structural typing, but its runtime support intentionally checks only shallow member presence. It does not deeply validate callable signatures, parameter compatibility, return types, async behavior, properties, or current attribute values.
+Stipulate is particularly useful at dynamic boundaries:
 
-Stipulate fills that gap while composing with Python's typing system instead of replacing it.
+```python
+plugin = load_plugin(config.plugin)
+plugin = validate(Plugin, plugin)
+```
+
+```python
+backend = container.resolve(Storage)
+backend = validate(Storage, backend)
+```
+
+```python
+fake = TestRepository()
+validate(Repository, fake, strict=True)
+```
+
+Stipulate is not intended to replace static checking. It complements it when static proof is unavailable.
+
+## Error experience
+
+Contract failures should be precise and machine-readable:
+
+```text
+2 validation errors for Repository
+
+get.id
+  Implementation parameter type is too narrow
+  expected implementation to accept: int
+  implementation accepts: PositiveInt
+  [type=parameter_type]
+
+save
+  Expected async method
+  [type=async_mismatch]
+```
+
+Structured errors should be consumable by CI systems, frameworks, IDE tooling, and tests.
 
 ## Design principles
 
@@ -75,6 +129,19 @@ Stipulate fills that gap while composing with Python's typing system instead of 
 - **Explicit strictness.** Missing annotations may be accepted in permissive mode and rejected in strict mode.
 - **No proxies by default.** Successful validation returns the original object.
 - **Runtime truth without pretending to implement unsupported typing features.** Unsupported constructs must fail clearly or be documented as unsupported.
+- **Interface specialization over general runtime typing.** Stipulate should remain focused on complete object contracts rather than becoming another general function-instrumentation library.
+
+## Future contract tooling
+
+Once the assignability engine and compiled interface representation are sufficiently trustworthy, Stipulate can potentially analyze interface evolution:
+
+```python
+compare_interfaces(StorageV1, StorageV2)
+```
+
+This could identify breaking and non-breaking contract changes for plugin APIs, frameworks, and libraries. A versioned `interface_schema()` can likewise support documentation, visualization, manifests, CI, and generated tooling.
+
+These capabilities depend on correctness of the underlying interface model and should not outrun it.
 
 ## Documentation
 
