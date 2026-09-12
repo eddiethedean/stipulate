@@ -2,9 +2,59 @@
 
 ## Goal
 
-Stipulate must preserve the value of the Python typing ecosystem rather than requiring users to choose between runtime validation and static structural typing.
+Stipulate is **Pyright strict from the beginning and permanently forward**.
 
-The desired declaration is:
+A package centered on Python interface contracts should hold itself to a high internal typing standard. Strict typing is therefore a project invariant, not a cleanup phase or pre-release hardening task.
+
+## Required checker mode
+
+The repository must configure Pyright with:
+
+```json
+{
+  "typeCheckingMode": "strict"
+}
+```
+
+Equivalent `pyproject.toml` configuration is acceptable if it produces the same behavior.
+
+All first-party source code must pass Pyright strict with zero errors before merge.
+
+## Scope
+
+Strict checking applies to:
+
+- `src/stipulate/`;
+- public API modules;
+- internal implementation modules;
+- CLI code;
+- optional integration packages when installed in their supported environments;
+- typing fixtures intended to demonstrate valid usage;
+- documentation examples that are promoted as type-safe examples.
+
+Tests may use narrowly justified exceptions where test construction requires intentionally invalid typing, but suppressions must be local and documented.
+
+## No warning-debt policy
+
+Do not accumulate typing debt for later cleanup.
+
+New code must not introduce broad suppressions such as file-wide `# pyright: ignore`, blanket `Any`, or disabled strict diagnostics merely to unblock implementation.
+
+When dynamic Python behavior genuinely cannot be represented precisely, isolate it behind a small typed boundary and document the reason.
+
+## Suppression policy
+
+A suppression is acceptable only when all of the following are true:
+
+1. the behavior is intentional;
+2. the checker cannot currently express it correctly;
+3. the suppression is as narrow as practical;
+4. a comment explains the limitation when it is non-obvious;
+5. the surrounding public API remains precisely typed.
+
+Typing workarounds for the `Interface` runtime bridge should be centralized rather than repeated across the codebase.
+
+## Desired declaration
 
 ```python
 from stipulate import Interface
@@ -14,7 +64,7 @@ class Repository(Interface):
     def get(self, id: int) -> User | None: ...
 ```
 
-and ordinary implementations should satisfy it structurally:
+Ordinary implementations should satisfy it structurally:
 
 ```python
 class PostgresRepository:
@@ -29,136 +79,86 @@ def use(repo: Repository) -> None:
 use(PostgresRepository())
 ```
 
-## Constraint in Python's typing model
+## Interface bridge
 
-Python's typing specification treats `Protocol` specially. A normal subclass of a protocol is not automatically a structural protocol unless the special `Protocol` base participates in the declaration.
+Python's typing specification treats `Protocol` specially. A normal subclass of a protocol is not automatically structural unless the special Protocol form participates in the declaration.
 
-This means a simple implementation such as:
+The prototype therefore uses a typing-facing `Interface` representation compatible with `Protocol` and a runtime representation that injects Stipulate machinery through `__mro_entries__`.
 
-```python
-class Interface(Protocol):
-    ...
+This mechanism must itself be proven under Pyright strict across every supported Python version.
 
-class Repository(Interface):
-    ...
-```
+## Method-first API challenge
 
-is insufficient for our typing goal.
-
-## Chosen bridge
-
-The prototype uses two representations of `Interface`:
-
-- a typing-facing representation that behaves as `Protocol`;
-- a runtime representation that expands the base list through `__mro_entries__` to include both Stipulate runtime machinery and `Protocol`.
-
-Conceptually:
+The desired public API is:
 
 ```python
-if TYPE_CHECKING:
-    Interface = Protocol
-else:
-    Interface = _InterfaceSentinel()
+Repository.validate(candidate)
+Repository.check(candidate)
+Repository.compare(RepositoryV2)
+Repository.schema()
+Repository.fingerprint()
+Repository.contract
 ```
 
-At runtime, the sentinel expands:
+Current Python typing has a known limitation around simultaneously representing `Interface` as the special Protocol base and exposing Stipulate metaclass methods to the checker.
+
+This is a first-class technical problem. The project should not silently waive strict checking around the public API.
+
+Any accepted solution must either:
+
+- make the method-first API pass Pyright strict directly; or
+- provide a narrowly scoped, clearly documented typing representation/stub strategy while preserving the same runtime API.
+
+A free-function fallback may exist only if required by current typing limitations and should remain secondary to the intended API.
+
+## Existing Protocols
 
 ```python
-class Foo(Interface):
-    ...
+from stipulate import Contract
+
+Storage = Contract(StorageProtocol)
 ```
 
-into the effective equivalent of:
-
-```python
-class Foo(_RuntimeInterface, Protocol):
-    ...
-```
-
-This preserves the desired user syntax and genuine runtime protocol identity.
-
-## Class-side API limitation
-
-Stipulate wants Pydantic-style sugar:
-
-```python
-Repository.model_validate(candidate)
-```
-
-The correct runtime home for that method is the metaclass, because placing it on the protocol itself would make it part of the structural implementation contract.
-
-Current Python typing cannot fully describe, through the single `Interface` alias, both of these facts simultaneously:
-
-1. subclasses are special structural protocols;
-2. their class objects expose Stipulate's custom metaclass API.
-
-Therefore:
-
-```python
-validate(Repository, candidate)
-```
-
-is the statically authoritative API, while:
-
-```python
-Repository.model_validate(candidate)
-```
-
-may exist as runtime sugar.
-
-Stipulate must document this honestly rather than requiring users to suppress checker errors silently.
-
-## No required checker plugin
-
-The normal experience must not require a mypy or Pyright plugin.
-
-A future optional plugin may improve:
-
-- recognition of class-side sugar;
-- richer diagnostics;
-- IDE navigation;
-- schema inspection;
-- Stipulate-specific configuration validation.
-
-But a plugin must never be required for basic structural compatibility.
+The `Contract` API must be fully typed under Pyright strict, including return types for `validate()`, `check()`, `compare()`, schema access, and fingerprints.
 
 ## Checker matrix
 
-CI should test at least:
+Pyright strict is the primary mandatory checker.
 
-- latest supported mypy;
-- latest supported Pyright;
-- representative Python versions.
+CI must run it on every supported Python/package configuration where feasible.
 
-Typing fixtures should contain both expected-success and expected-failure examples.
+Mypy remains an important interoperability target and should have conformance fixtures, but passing mypy must not weaken the Pyright strict baseline.
 
 ## Public typing guarantees
 
-For the core API, Stipulate should guarantee:
+Public APIs should avoid leaking `Any` unless the underlying typing semantics genuinely require it.
 
-```python
-repo = validate(Repository, candidate)
-```
-
-is inferred as `Repository`.
-
-Similarly:
-
-```python
-adapter = InterfaceAdapter(Repository)
-repo = adapter.validate_python(candidate)
-```
-
-should preserve the interface type parameter.
+Generic APIs should preserve types precisely. For example, validating against a contract should return the interface/contract type rather than `object` or `Any` wherever Python typing can express that relationship.
 
 ## Stub policy
 
-Ship complete type information with the package. If `.pyi` files are needed to represent runtime tricks safely, they are part of the public API contract and must be tested in CI.
+Ship complete type information with the package. If `.pyi` files are required to represent runtime metaclass tricks safely, they are part of the public API and must themselves pass the checker suite.
 
-Never expose private CPython typing implementation types such as `_ProtocolMeta` in public annotations.
+Never expose private CPython typing implementation classes such as `_ProtocolMeta` in public annotations.
 
-## Checker disagreement
+## Strictness and dynamic internals
 
-If mypy and Pyright disagree on a valid typing pattern, prefer the most specification-aligned portable form and document unavoidable discrepancies.
+Runtime introspection inevitably touches dynamic objects. The implementation should convert dynamic/unknown data into normalized typed internal structures as early as practical.
 
-Do not introduce implementation hacks solely to satisfy one checker if they undermine runtime correctness or the other checker.
+Prefer:
+
+```text
+untyped/dynamic Python boundary
+        ↓
+small normalization layer
+        ↓
+strictly typed Contract IR and compatibility engine
+```
+
+rather than spreading `Any` throughout the engine.
+
+## CI rule
+
+A change that fails Pyright strict is not merge-ready.
+
+Strict typing remains required for all future releases, refactors, integrations, and performance rewrites, including any future Rust/PyO3 boundary on the Python side.
