@@ -4,6 +4,8 @@
 
 Turn the validated prototype into a maintainable production package without losing the typing semantics that make Stipulate valuable.
 
+The authoritative unresolved-engineering backlog is [OPEN_TECHNICAL_PROBLEMS.md](OPEN_TECHNICAL_PROBLEMS.md). Implementation work must map semantic changes to OTP items and satisfy their acceptance criteria before those problems are considered resolved.
+
 ## Milestone 1 — Package foundation
 
 Create the package skeleton:
@@ -37,6 +39,8 @@ Add:
 - coverage;
 - CI across supported Python versions.
 
+Also establish the first explicit support matrix for OTP-025.
+
 ## Milestone 2 — Interface bridge
 
 Implement and freeze the smallest possible runtime bridge that supports:
@@ -56,6 +60,8 @@ Requirements:
 
 This milestone is a release blocker because the rest of the public API depends on it.
 
+Primary OTP: OTP-001. Preserve OTP-002 as a documented limitation unless Python typing capabilities change.
+
 ## Milestone 3 — Compiled model
 
 Implement:
@@ -70,11 +76,17 @@ Implement:
 
 The compiler should contain no candidate-specific state.
 
+Primary OTPs: OTP-005, OTP-012, OTP-021.
+
 ## Milestone 4 — Error foundation
 
 Implement `InterfaceValidationError` and structured records before expanding validation logic.
 
+Also define a distinct path for interface-definition/compilation failures so malformed or unresolved interfaces are not reported as ordinary candidate mismatches.
+
 Stable initial error codes should be used throughout tests from this point onward.
+
+Primary OTPs: OTP-013 and OTP-022.
 
 ## Milestone 5 — Callable validation
 
@@ -90,9 +102,12 @@ Order:
 6. `*args`;
 7. `**kwargs`;
 8. method binding normalization;
-9. async mismatch detection.
+9. async mismatch detection;
+10. decorator/signature recovery policy.
 
 Build specification-oriented fixtures before adding advanced annotations.
+
+Primary OTPs: OTP-003, OTP-015, OTP-016.
 
 ## Milestone 6 — Core assignability
 
@@ -108,6 +123,7 @@ Initial cases:
 
 - identity;
 - `Any`;
+- missing annotations under strict/permissive policy;
 - `None`;
 - normal subclass relationships;
 - unions;
@@ -116,6 +132,10 @@ Initial cases:
 - common generic forms with known variance.
 
 Use this engine contravariantly for callable parameters and covariantly for returns.
+
+Unsupported constructs must produce explicit diagnostics rather than fall back to equality.
+
+Primary OTPs: OTP-004 and OTP-010.
 
 ## Milestone 7 — Attributes and properties
 
@@ -127,6 +147,10 @@ Implement separate representations for:
 - writable properties.
 
 Do not infer full declaration compatibility solely from the current runtime value.
+
+Define the 0.1 policy for custom descriptors, dynamic members, and instance-only attributes even if richer support is deferred.
+
+Primary OTPs: OTP-011, OTP-012, OTP-014.
 
 ## Milestone 8 — Public APIs
 
@@ -145,7 +169,9 @@ Foo.model_validate(value)
 Foo.interface_schema()
 ```
 
-Document the class-side typing limitation clearly.
+Document the class-side typing limitation clearly. Do not treat the shape returned by `interface_schema()` as a stable public schema until OTP-023 is resolved.
+
+Primary OTPs: OTP-002 and OTP-023.
 
 ## Milestone 9 — Checker conformance
 
@@ -160,7 +186,7 @@ Must verify:
 - interface inheritance;
 - generic behavior only when actually supported.
 
-Record intentional checker disagreements.
+Record intentional checker disagreements according to OTP-010 rather than forcing accidental parity.
 
 ## Milestone 10 — Hardening
 
@@ -173,8 +199,41 @@ Before the first public beta:
 - multi-error aggregation tests;
 - weak-cache lifecycle tests;
 - thread-safety tests;
+- mutation/cache policy tests;
 - benchmark baseline;
 - documentation examples executed as tests where practical.
+
+Primary OTPs: OTP-020, OTP-021, OTP-024, plus unresolved 0.1 blockers.
+
+## Milestone 11 — Generic correctness
+
+Do not begin broad generic support until the 0.1 core is trustworthy.
+
+Implement:
+
+- `TypeVar` specialization and coherent binding environments;
+- bounded and constrained variables;
+- inherited generic interfaces;
+- explicit covariance and contravariance;
+- Python 3.12+ inferred variance where runtime metadata is sufficient.
+
+Primary OTPs: OTP-006 and OTP-007.
+
+## Milestone 12 — Advanced callable typing
+
+Only after spec-driven designs and fixtures exist, consider:
+
+- overload sets;
+- `ParamSpec`;
+- `Concatenate`;
+- `Self`;
+- `TypeVarTuple`;
+- `Unpack`;
+- typed `**kwargs`;
+- nested protocol semantics;
+- expanded async/generator semantics.
+
+Primary OTPs: OTP-008, OTP-009, OTP-016, OTP-017, OTP-018, OTP-019.
 
 ## Implementation rules
 
@@ -198,6 +257,14 @@ Isolate compatibility code that interacts with CPython-specific runtime protocol
 
 Compiled contracts should be safe to share between threads and validation calls.
 
+### Treat open technical problems as release gates
+
+A feature is not complete merely because a happy-path implementation exists. If it maps to an OTP item, its specified acceptance tests and policy questions must be resolved before support is advertised.
+
+### Preserve unsupported behavior explicitly
+
+If an advanced form is not yet implemented, tests should assert the unsupported diagnostic so a later refactor cannot accidentally begin accepting it without design review.
+
 ## Definition of done for 0.1
 
 A 0.1 release should be able to demonstrate:
@@ -216,9 +283,15 @@ with:
 - bad return variance rejected;
 - bad signature shape rejected;
 - async mismatch rejected;
+- common forward references resolved or diagnosed clearly;
 - properties/attributes validated for the documented scope;
+- definition errors separated from candidate errors;
 - useful aggregated errors;
 - warm validation using cached compilation;
-- explicit diagnostics for unsupported constructs.
+- explicit diagnostics for unsupported constructs;
+- documented mutation/cache behavior;
+- supported Python versions proven in CI.
+
+Every OTP listed as a 0.1 release gate in `OPEN_TECHNICAL_PROBLEMS.md` must be resolved or have an intentionally frozen, documented policy before 0.1 is declared ready.
 
 Do not expand the public feature set until this base is trustworthy.
