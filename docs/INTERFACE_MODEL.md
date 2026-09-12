@@ -1,8 +1,14 @@
-# Interface Model
+# Public Interface Model
 
 ## Goal
 
-The interface declaration should feel like defining a Pydantic model, but describe an object's behavioral contract instead of JSON-shaped data.
+Stipulate should feel like normal Python classes with useful methods, not a collection of helper functions or a custom DSL.
+
+The public vocabulary is:
+
+> **Define. Validate. Evolve.**
+
+## Defining a contract
 
 ```python
 from stipulate import Interface
@@ -19,91 +25,258 @@ class Repository(Interface):
     def ready(self) -> bool: ...
 ```
 
-Implementations do not inherit from the interface:
+Implementations remain ordinary Python classes and do not inherit from the interface.
+
+## Primary method API
+
+An `Interface` subclass is an active contract object. The primary public API is method-first:
 
 ```python
-class PostgresRepository:
-    name = "postgres"
-
-    def get(self, id: int) -> User | None:
-        ...
-
-    async def save(self, user: User) -> None:
-        ...
-
-    @property
-    def ready(self) -> bool:
-        return True
+Repository.validate(candidate)
+Repository.check(candidate)
+Repository.compare(RepositoryV2)
+Repository.schema()
+Repository.fingerprint()
+Repository.contract
 ```
+
+Documentation should prefer these forms over free functions that take an interface as their first argument.
+
+### Validate
+
+```python
+repo = Repository.validate(candidate)
+repo = Repository.validate(candidate, strict=True)
+```
+
+Successful validation returns the original object. Failure raises `ContractError`.
+
+### Check
+
+```python
+result = Repository.check(candidate)
+```
+
+`check()` is non-throwing and returns `CompatibilityResult`.
+
+```python
+if result:
+    register(candidate)
+
+result.compatible
+result.complete
+result.errors()
+result.unknowns()
+result.evidence
+```
+
+Truthiness represents compatibility, not completeness. Unknown evidence remains available through the result.
+
+### Compare
+
+```python
+report = RepositoryV1.compare(RepositoryV2)
+```
+
+The report exposes semantic evolution information:
+
+```python
+report.breaking
+report.implementers
+report.consumers
+report.changes
+```
+
+The exact report API remains subject to evolution-design acceptance tests, but the method form is the intended user experience.
+
+### Contract metadata
+
+```python
+Repository.contract
+```
+
+is a cached immutable `Contract` representation.
+
+Metadata is exposed as a property because it is state/representation rather than an action.
+
+Operations remain methods:
+
+```python
+Repository.schema()
+Repository.fingerprint()
+```
+
+These may delegate to `Repository.contract.schema()` and `.fingerprint()`.
+
+## Existing Protocols
+
+Zero-migration adoption uses `Contract` directly:
+
+```python
+from typing import Protocol
+from stipulate import Contract
+
+
+class RepositoryProtocol(Protocol):
+    def get(self, id: int) -> User | None: ...
+
+
+Repository = Contract(RepositoryProtocol)
+
+Repository.validate(candidate)
+Repository.check(candidate)
+Repository.compare(other)
+Repository.schema()
+Repository.fingerprint()
+```
+
+`Contract` replaces the previously planned `InterfaceAdapter`/`ContractAdapter` public concepts.
+
+For a `Contract` instance:
+
+```python
+Repository.contract is Repository
+```
+
+should be the conceptual invariant.
+
+## Public classes
+
+The core public types are intended to be:
+
+```python
+Interface
+Contract
+CompatibilityResult
+CompatibilityReport
+Evidence
+ContractError
+ContractDefinitionError
+```
+
+Most users should initially need to import only `Interface`, or `Contract` when adapting an existing Protocol.
+
+## Errors
+
+Candidate incompatibility uses:
+
+```python
+ContractError
+```
+
+Invalid/unresolvable contract definitions use:
+
+```python
+ContractDefinitionError
+```
+
+`ContractError.errors()` exposes structured findings/evidence suitable for tests and tooling.
+
+## Schema
+
+Use:
+
+```python
+Repository.schema()
+```
+
+not `interface_schema()`.
+
+The schema represents a Stipulate contract and is not JSON Schema.
+
+Future deserialization may support:
+
+```python
+Contract.from_schema(schema)
+```
+
+only after schema versioning and type identity semantics are stable.
+
+## Testing ergonomics
+
+A future testing convenience should prefer a method:
+
+```python
+Repository.assert_valid(fake_repository)
+```
+
+rather than a pytest-specific marker or `assert_contract(Repository, fake)` helper.
+
+The core validation API should already be usable directly in tests, so this helper is not a 0.1 requirement.
+
+## Pythonic behavior
+
+`CompatibilityResult` should support truth testing:
+
+```python
+if Repository.check(candidate):
+    ...
+```
+
+Rich result/report objects should have useful `str`/`repr` output for REPL, notebook, test, and CI usage.
+
+Avoid clever operators such as:
+
+```python
+candidate in Repository
+Repository[candidate]
+Repository @ candidate
+Repository(candidate)
+```
+
+They obscure validation semantics or imply construction/coercion.
+
+Normal inheritance remains the interface-composition mechanism:
+
+```python
+class Storage(Readable, Writable):
+    pass
+```
+
+## Free functions
+
+Free functions such as:
+
+```python
+validate(Repository, candidate)
+check(Repository, candidate)
+compare(RepositoryV1, RepositoryV2)
+compile_contract(Repository)
+```
+
+must not be the primary documented interface.
+
+They may exist internally, as thin implementation primitives, or as narrowly justified compatibility APIs where static typing requires them. If a free-function form is retained because current type checkers cannot describe a class-side method correctly, documentation must clearly distinguish that technical fallback from the preferred ergonomic API.
+
+## Static typing caveat
+
+The desired `class Foo(Interface):` syntax and class-side methods create a known limitation in today's typing model: presenting `Interface` to checkers as the special Protocol base does not automatically make Stipulate metaclass methods statically visible.
+
+This is an unresolved technical problem, not a reason to design an inferior user interface prematurely.
+
+The project should target the method-first API while continuing to test possible checker-safe representations. If a statically authoritative fallback is required, keep it minimal and secondary.
 
 ## Structural semantics
 
-Stipulate interfaces are structural. An implementation satisfies an interface based on compatible members, not inheritance.
+Stipulate interfaces are structural. Implementations satisfy contracts based on compatible members, not inheritance or registration.
 
-Nominal inheritance may still be used by application code, but Stipulate must not require it.
+Extra implementation members are allowed by default.
 
 ## Member categories
 
-The compiler should classify members explicitly.
+The contract compiler explicitly models:
 
-### Instance methods
+- instance methods;
+- async methods;
+- attributes;
+- read-only and writable properties;
+- class methods;
+- static methods;
+- inherited members.
 
-```python
-class Service(Interface):
-    def run(self, value: str) -> int: ...
-```
+Each category must use its actual assignability semantics rather than textual signature equality.
 
-Validate:
-
-- member presence;
-- callable nature;
-- signature compatibility;
-- parameter assignability;
-- return assignability;
-- sync/async compatibility.
-
-### Async methods
-
-```python
-class Service(Interface):
-    async def run(self, value: str) -> int: ...
-```
-
-An ordinary synchronous method is not compatible merely because it returns an awaitable unless Stipulate explicitly adds such a compatibility rule in a future version.
-
-Initial behavior should prefer clear syntactic async compatibility.
-
-### Attributes
-
-```python
-class Service(Interface):
-    name: str
-```
-
-Stipulate must distinguish two questions:
-
-1. Does the implementation declare a compatible attribute contract?
-2. Does this specific instance currently contain a compatible value?
-
-The core interface validator should primarily validate the declared/member contract. Optional value validation may inspect current values where meaningful.
-
-### Properties
-
-```python
-class Service(Interface):
-    @property
-    def name(self) -> str: ...
-```
-
-A read-only property should be represented separately from a writable attribute because mutability affects assignability.
-
-### Class methods and static methods
-
-These should be supported deliberately rather than accidentally. Their binding behavior and first parameters differ from ordinary methods and must be normalized before compatibility checks.
-
-## Inheritance
-
-Interfaces may compose through normal inheritance:
+## Interface inheritance
 
 ```python
 class Readable(Interface):
@@ -118,60 +291,29 @@ class Storage(Readable, Writable):
     pass
 ```
 
-The compiler should merge inherited members, preserve overriding semantics, and detect impossible or conflicting declarations.
+The compiler merges inherited requirements, applies overriding semantics, and reports impossible/conflicting definitions as contract-definition errors.
 
-## Existing Protocols
+## Public API design rule
 
-Stipulate should support ordinary `typing.Protocol` classes through `InterfaceAdapter`:
+When an operation naturally belongs to an `Interface` or `Contract`, prefer a method.
 
-```python
-class ExistingRepository(Protocol):
-    def get(self, id: int) -> User | None: ...
+Use free functions only when the operation has no natural owner or a documented Python typing limitation requires a fallback.
 
+This keeps the user model centered on the contract itself:
 
-adapter = InterfaceAdapter(ExistingRepository)
-adapter.validate_python(candidate)
+```text
+Define
+    class Foo(Interface)
+
+Validate
+    Foo.validate(obj)
+    Foo.check(obj)
+
+Evolve
+    Foo.compare(FooV2)
+
+Inspect
+    Foo.contract
+    Foo.schema()
+    Foo.fingerprint()
 ```
-
-This is important for adoption in mature codebases.
-
-## Metadata API
-
-Compiled interfaces should expose machine-readable metadata:
-
-```python
-Repository.interface_schema()
-```
-
-The schema is not JSON Schema. It should be treated as a Stipulate interface schema with a versioned format.
-
-Example conceptual form:
-
-```python
-{
-    "schema_version": 1,
-    "name": "Repository",
-    "members": {
-        "get": {
-            "kind": "method",
-            "async": False,
-            "parameters": [...],
-            "return": "User | None",
-        }
-    },
-}
-```
-
-Do not promise stable serialization until the schema format has an explicit versioning policy.
-
-## Optional members
-
-Optional interface members are useful but should not be rushed into the first release because Python `Protocol` has no direct universal optional-member syntax.
-
-A future Stipulate-specific declaration may be introduced only if it remains clear to static type checkers or is explicitly documented as runtime-only metadata.
-
-## Extra members
-
-Extra implementation members are always allowed by default. Structural interfaces describe minimum required capability, not exact object shape.
-
-A future exact-interface mode could exist for specialized cases, but it should not be the default.
