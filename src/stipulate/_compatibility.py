@@ -175,12 +175,15 @@ def _blocked(member: MemberIR, root: tuple[str | int, ...]) -> list[Evidence]:
     ]
 
 
-def _instance_dict(candidate: object) -> dict[str, object] | None:
+def _instance_dict(candidate: object) -> dict[str, object] | Unavailable | None:
     raw, _ = _lookup(type(candidate), "__dict__")
     if type(raw) is not types.GetSetDescriptorType:
         return None
     # This is the standard instance-dictionary descriptor, never a user property.
-    return cast(dict[str, object], raw.__get__(candidate, type(candidate)))
+    try:
+        return cast(dict[str, object], raw.__get__(candidate, type(candidate)))
+    except (TypeError, ValueError):
+        return Unavailable("descriptor_unverifiable")
 
 
 def _has_descriptor(raw: object) -> bool:
@@ -201,6 +204,8 @@ def inspect_candidate(ir: ContractIR, candidate: object) -> CompatibilityResult:
             ),
             len(ir.members),
         )
+    if not ir.members:
+        return CompatibilityResult(ir.name, (), 0)
     findings: list[Evidence] = []
     cls = type(candidate)
     lookup, lookup_owner = _lookup(cls, "__getattribute__")
@@ -226,6 +231,22 @@ def inspect_candidate(ir: ContractIR, candidate: object) -> CompatibilityResult:
     unsafe = not metadata_safe(cls) or not standard_lookup
     dynamic = _lookup(cls, "__getattr__")[0] is not inspect_missing
     instance = None if unsafe else _instance_dict(candidate)
+    if isinstance(instance, Unavailable):
+        root = ("__dict__",)
+        findings = [
+            _fact(
+                root,
+                EvidenceStatus.UNKNOWN,
+                instance.code,
+                "The instance dictionary descriptor cannot be inspected for this candidate",
+            )
+        ]
+        for member in ir.members:
+            findings.extend(_blocked(member, root))
+        return CompatibilityResult(ir.name, tuple(findings), len(ir.members))
+    instance_dict = instance
+    write_hook = _lookup(cls, "__setattr__")[0]
+    write_dynamic = write_hook is not inspect_missing and write_hook is not object.__setattr__
     for member in ir.members:
         root = (member.name,)
         if unsafe:
@@ -242,7 +263,7 @@ def inspect_candidate(ir: ContractIR, candidate: object) -> CompatibilityResult:
         raw, owner = _lookup(cls, member.name)
         # Data properties take precedence over instance storage. Ordinary class
         # functions can be shadowed by instance values, which do not bind methods.
-        in_instance = instance is not None and member.name in instance
+        in_instance = instance_dict is not None and member.name in instance_dict
         if raw is inspect_missing and not in_instance:
             code = "dynamic_member_unverifiable" if dynamic else "missing_member"
             status = EvidenceStatus.UNKNOWN if dynamic else EvidenceStatus.INCOMPATIBLE
@@ -384,7 +405,9 @@ def inspect_candidate(ir: ContractIR, candidate: object) -> CompatibilityResult:
                 )
                 findings.extend(_uncertainties((member.name, "return"), check.return_relation))
         else:
-            _attribute(member, cls, raw, owner, instance, ir.annotations, findings)
+            _attribute(
+                member, cls, raw, owner, instance_dict, ir.annotations, findings, write_dynamic
+            )
     return CompatibilityResult(ir.name, tuple(findings), len(ir.members))
 
 
@@ -396,6 +419,7 @@ def _attribute(
     instance: dict[str, object] | None,
     policy: Policy,
     findings: list[Evidence],
+    write_dynamic: bool,
 ) -> None:
     code = "property_type" if type(raw) is property or member.property else "attribute_type"
     read_issue: Evidence | None = None
@@ -469,7 +493,7 @@ def _attribute(
                 read = declared_annotation(declaring, declaring, member.name, policy)
                 break
         write = read
-        writable = instance is not None
+        writable = instance is not None and not write_dynamic
     findings.append(
         _fact(
             (member.name, "kind"),
@@ -485,7 +509,16 @@ def _attribute(
         findings.append(_relation((member.name, "read"), relation, code, member.read_type, read))
         findings.extend(_uncertainties((member.name, "read"), relation))
     if member.writable:
-        if not writable:
+        if write_dynamic and type(raw) is not property:
+            findings.append(
+                _fact(
+                    (member.name, "write"),
+                    EvidenceStatus.UNKNOWN,
+                    "dynamic_member_unverifiable",
+                    "Custom write dispatch prevents a static writable-capability proof",
+                )
+            )
+        elif not writable:
             findings.append(
                 _fact(
                     (member.name, "write"),

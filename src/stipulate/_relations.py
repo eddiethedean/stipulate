@@ -85,7 +85,8 @@ def form_parts(value: object) -> tuple[object, tuple[object, ...]]:
         return None, ()
     cls = type(value)
     module = type.__getattribute__(cls, "__module__")
-    if cls not in (types.GenericAlias, types.UnionType) and module not in (
+    is_generic_alias = any(cls is generic for generic in (types.GenericAlias, types.UnionType))
+    if not is_generic_alias and module not in (
         "typing",
         "typing_extensions",
     ):
@@ -132,9 +133,11 @@ def supported(value: object, active: frozenset[int] = frozenset()) -> bool:
 def _nominal(source: type[object], destination: type[object]) -> Relation:
     if any(destination is base for base in class_mro(source)):
         return ok()
-    if source in (bool, int) and destination in (float, complex):
+    source_is_int = any(base is int for base in class_mro(source))
+    source_is_float = any(base is float for base in class_mro(source))
+    if source_is_int and any(destination is target for target in (float, complex)):
         return ok()
-    if source is float and destination is complex:
+    if source_is_float and destination is complex:
         return ok()
     routes: dict[type[object], tuple[type[object], ...]] = {
         list: (Sequence, Iterable),
@@ -147,7 +150,23 @@ def _nominal(source: type[object], destination: type[object]) -> Relation:
         bytes: (Sequence, Iterable),
         bytearray: (Sequence, Iterable),
     }
-    return ok() if any(destination in routes.get(base, ()) for base in class_mro(source)) else bad()
+    return (
+        ok()
+        if any(
+            any(destination is route for route in routes_for(routes, base))
+            for base in class_mro(source)
+        )
+        else bad()
+    )
+
+
+def routes_for(
+    routes: dict[type[object], tuple[type[object], ...]], key: type[object]
+) -> tuple[type[object], ...]:
+    for route_key, values in routes.items():
+        if route_key is key:
+            return values
+    return ()
 
 
 def relate(source: object, destination: object) -> Relation:
@@ -201,10 +220,18 @@ def relate(source: object, destination: object) -> Relation:
         Mapping: (Mapping, Iterable),
         Iterable: (Iterable,),
     }
-    if db not in routes.get(sb, ()):
-        if so is None and any(db in routes.get(base, ()) for base in class_mro(sb)):
+    if not any(db is route for route in routes_for(routes, sb)):
+        if so is None and any(
+            any(db is route for route in routes_for(routes, base)) for base in class_mro(sb)
+        ):
             return unknown("unsupported_type")
         return bad()
+    if destination is typing.Tuple:
+        if source is typing.Tuple:
+            return unknown("gradual_type")
+        return ok() if so is tuple or source is tuple else bad()
+    if source is typing.Tuple:
+        return unknown("gradual_type")
     if not da and do is not tuple:
         return ok()
     # tuple[()] is a fixed empty tuple; a bare tuple erases its length/element type.
@@ -225,7 +252,7 @@ def relate(source: object, destination: object) -> Relation:
         return all_of(relate(a, da[0]) for a in (sa[:1] if homogeneous else sa))
     if db is Iterable:
         return relate(sa[0], da[0])
-    if db in (list, set, dict):
+    if any(db is container for container in (list, set, dict)):
         return all_of(all_of((relate(a, b), relate(b, a))) for a, b in zip(sa, da))
     if db is Mapping:
         return all_of((relate(sa[0], da[0]), relate(da[0], sa[0]), relate(sa[1], da[1])))

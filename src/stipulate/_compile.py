@@ -6,6 +6,8 @@ import typing
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from typing_extensions import Protocol as ExtensionsProtocol
+
 from ._annotations import Policy, annotation_map, declared_annotation
 from ._errors import ContractDefinitionError
 from ._evidence import Evidence, EvidenceStatus
@@ -121,6 +123,7 @@ def _member(
             or getter.parameters
             or inspect.iscoroutinefunction(raw.fget)
             or inspect.isgeneratorfunction(raw.fget)
+            or inspect.isasyncgenfunction(raw.fget)
         ):
             raise _failure(
                 "invalid_contract",
@@ -207,7 +210,10 @@ def _compile_contract(
             "invalid_contract", (), "Custom metaclass lookup is unsupported", "declaration"
         )
     namespace = class_dict(declaration)
-    if not namespace.get("_is_protocol", False):
+    protocol_roots = (cast(type[object], typing.Protocol), cast(type[object], ExtensionsProtocol))
+    if not namespace.get("_is_protocol", False) or not any(
+        base is root for base in class_mro(declaration) for root in protocol_roots
+    ):
         raise _failure(
             "invalid_contract", (), "The declaration must explicitly be a Protocol", "declaration"
         )
@@ -230,7 +236,12 @@ def _compile_contract(
     }
     owners: dict[str, list[type[object]]] = {}
     for owner in class_mro(declaration):
-        if owner in (object, typing.Protocol, typing.Generic):
+        excluded_owners = (
+            object,
+            cast(type[object], typing.Protocol),
+            cast(type[object], typing.Generic),
+        )
+        if any(owner is excluded_owner for excluded_owner in excluded_owners):
             continue
         values = class_dict(owner)
         # The typing_extensions Protocol root has no user obligations.

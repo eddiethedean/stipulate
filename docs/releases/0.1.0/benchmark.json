@@ -1,7 +1,7 @@
 {
   "release_version": "0.1.0",
-  "runtime_source_digest": "069f51c9ec7343bbe14f854adcd80ee9ae85f926553f28c22e4a78dafecabbaa",
-  "installed_distribution_sha256": "814ec67ff212033d5d346490077936e10ddfb9c1b422b8663bf8dc4dca7662ba",
+  "runtime_source_digest": "42f984420692fb3700e7185e7152ab979c386365a954feaf127b73877040e8ab",
+  "installed_distribution_sha256": "0b2e9f56860389511b4e506817ec1b470fbebc6f3465ad51de914ff8f107342a",
   "environment": {
     "python": "3.11.15",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -15,52 +15,52 @@
     {
       "workload": "cold_compile",
       "iterations": 100,
-      "seconds": 0.0034740837290883064
+      "seconds": 0.0035600829869508743
     },
     {
       "workload": "retained_construction",
       "iterations": 100,
-      "seconds": 8.254218846559525e-05
+      "seconds": 8.641742169857025e-05
     },
     {
       "workload": "compatible_check",
       "iterations": 100,
-      "seconds": 0.007480708882212639
+      "seconds": 0.010703625157475471
     },
     {
       "workload": "incompatible_check",
       "iterations": 100,
-      "seconds": 0.007469499483704567
+      "seconds": 0.010920291766524315
     },
     {
       "workload": "unknown_check",
       "iterations": 100,
-      "seconds": 0.005482208915054798
+      "seconds": 0.010187291540205479
     },
     {
       "workload": "strict_enforcement",
       "iterations": 100,
-      "seconds": 0.0076867081224918365
+      "seconds": 0.010918792337179184
     },
     {
       "workload": "permissive_enforcement",
       "iterations": 100,
-      "seconds": 0.005739250220358372
+      "seconds": 0.009909791871905327
     },
     {
       "workload": "temporary_construction",
       "iterations": 100,
-      "seconds": 0.0032232506200671196
+      "seconds": 0.0035204580053687096
     },
     {
       "workload": "wide_contract",
       "iterations": 5,
-      "seconds": 0.01827349979430437
+      "seconds": 0.025725125335156918
     },
     {
       "workload": "deep_type",
       "iterations": 5,
-      "seconds": 0.08437041658908129
+      "seconds": 0.09001250006258488
     }
   ]
 }

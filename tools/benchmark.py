@@ -21,6 +21,10 @@ class Requirement(Protocol):
     def read(self, key: str) -> bytes: ...
 
 
+def wide_read(self: object, *, key: str) -> bytes:
+    return b""
+
+
 class Good:
     def read(self, key: object) -> bytes:
         return b""
@@ -79,10 +83,14 @@ def run(root: Path, distribution: Path, iterations: int) -> dict[str, object]:
         {
             "__module__": __name__,
             "_is_protocol": True,
-            **{f"method_{i:03d}": Requirement.read for i in range(50)},
+            **{f"method_{i:03d}": (wide_read if i == 0 else Requirement.read) for i in range(50)},
         },
     )
-    wide_impl = type("WideImpl", (), {f"method_{i:03d}": Good.read for i in range(50)})()
+    wide_impl = type(
+        "WideImpl",
+        (),
+        {f"method_{i:03d}": (wide_read if i == 0 else Good.read) for i in range(50)},
+    )()
     wide_contract = Contract(cast(TypeForm[object], wide))
     measurements.append(
         measure("wide_contract", lambda: wide_contract.check(wide_impl), max(1, iterations // 20))
