@@ -1,7 +1,7 @@
 {
   "release_version": "0.1.0",
-  "runtime_source_digest": "4d212005ff5f6e1f2774f21edf8d268bd8090c0ebeacc0cfcf2ea0be855fa8c3",
-  "installed_distribution_sha256": "61c687bb2ff0d92ff0c30673ee7c8fbb0ffc68d609119c9bd68d19e11a06fe33",
+  "runtime_source_digest": "e73bd7cb64644e6c5535acb2e945d0f073ce18009da1300ed4ef74625589ebf9",
+  "installed_distribution_sha256": "5e1bdd0a8dd26fb27553e1d37554d3bcafd57847a60a36c360c40144f17a4237",
   "environment": {
     "python": "3.11.15",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
