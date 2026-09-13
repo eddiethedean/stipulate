@@ -1,5 +1,10 @@
 # Stipulate
 
+[![CI](https://github.com/eddiethedean/stipulate/actions/workflows/check.yml/badge.svg)](https://github.com/eddiethedean/stipulate/actions/workflows/check.yml)
+[![Release](https://github.com/eddiethedean/stipulate/actions/workflows/release.yml/badge.svg)](https://github.com/eddiethedean/stipulate/actions/workflows/release.yml)
+[![PyPI](https://img.shields.io/pypi/v/stipulate.svg)](https://pypi.org/project/stipulate/)
+[![Python](https://img.shields.io/pypi/pyversions/stipulate.svg)](https://pypi.org/project/stipulate/)
+
 **Contracts for Python interfaces.**
 
 **Define. Validate. Evolve.**
@@ -8,9 +13,9 @@ Stipulate checks dynamically supplied implementations against Python structural 
 
 ## Status
 
-This repository contains the Stipulate 0.1 implementation, design specification, and design probes. The core API checks declared Protocol compatibility without executing candidate operations. Earlier prototypes are historical inputs, not release evidence.
+Stipulate 0.1.0 is released on [PyPI](https://pypi.org/project/stipulate/0.1.0/), with the source and release evidence checked by CI. The core API checks declared Protocol compatibility without executing candidate operations. Earlier prototypes are historical inputs, not release evidence.
 
-Install with `python -m pip install .` (CPython 3.11–3.14). See the [implemented feature guide](docs/IMPLEMENTED_0_1.md) for the supported boundary. Independent Sol review is still required before release approval.
+Install the released package with `python -m pip install stipulate==0.1.0` (CPython 3.11–3.14). See the [implemented feature guide](docs/IMPLEMENTED_0_1.md) for the supported boundary.
 
 ## Define and validate
 
