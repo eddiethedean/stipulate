@@ -62,6 +62,8 @@ This mapping is a planning aid, not permission to mark an OTP resolved early. Th
 
 ## 0.1 — Core validation
 
+The [phase 0.1 implementation contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md) defines the bounded architecture, public-contract clarifications, stable acceptance IDs, verification matrix, and dependency-aware implementation phases for this entire release. It is a plan, not evidence that the release gates have passed.
+
 ### User outcome
 
 A developer with an existing `typing.Protocol` can validate a dynamically loaded implementation, receive the original object with the Protocol type preserved, and understand a mismatch immediately.

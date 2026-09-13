@@ -14,6 +14,10 @@ Default `annotations="trusted"` resolves annotations with controlled namespaces 
 
 No attempt should automatically import TYPE_CHECKING-only names. Advanced `globalns` and `localns` mappings apply to the requirement declaration only. Candidate annotations use their own defining module and owner context; never resolve them against the requirement namespace merely because names match. Unavailable candidate-local names remain unknown. The constructor mappings are copied for stable key/value bindings (referenced objects are not deep-frozen). Custom namespaces bypass the shared global compilation cache in 0.1. Document that annotation resolution can fail for unavailable function-local names.
 
+Supplied requirement globalns entries overlay each selected declaration's defining globals; localns entries overlay its declaring owner locals, with ordinary local lookup precedence. Inherited declarations retain their defining context. Resolve independent annotations separately where possible so an unresolved return cannot hide a known parameter mismatch. Supplying either mapping, even an empty one, bypasses shared caching.
+
+On CPython 3.14, raw mode must avoid deferred __annotations__ getters and annotation functions even when requested in STRING/FORWARDREF format. Passing eval_str=False to inspect.signature is insufficient: deferred annotations may still be evaluated. Recover input shapes without requesting annotation evaluation. If no non-evaluating path can obtain a required annotation or member set, fail construction with annotation_unresolved; candidate-only metadata remains non-permissible annotation_unresolved uncertainty. Materialized dictionaries/explicit Signature metadata may be used only when obtainable without invoking an annotation factory. This is a deliberately narrower raw subset, not a sandbox. [Python's annotationlib documentation](https://docs.python.org/3.14/library/annotationlib.html#security-implications-of-introspecting-annotations) describes these evaluation effects. The [phase 0.1 contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#annotations-and-trust-boundaries) defines the testable boundary.
+
 ## Static member inspection
 
 Use static lookup to determine declaration presence, member kind, and supported storage. Do not call candidate methods, property getters, custom descriptor accessors, or dynamic __getattr__ hooks to gather evidence. Do not claim static inspection establishes how a custom __getattribute__ implementation will behave.
@@ -46,6 +50,8 @@ Support statically declared plain instance/class storage and standard property d
 Use declared read/write types. A property getter's return annotation establishes its declared read type; a setter parameter establishes its declared write type. A current value is not a declaration and is not checked for recursive value conformance in 0.1.
 
 Properties are never invoked to see whether they return the annotated value. Dynamic attributes, custom descriptors, cached_property, and generated framework storage remain unsupported unless a later explicit handler passes its gates.
+
+In 0.1, ordinary instance dictionaries and plain class storage establish supported presence; annotations alone do not. Standard slots yield descriptor_unverifiable uncertainty when initialization cannot be established without executing their descriptor. With ordinary __getattribute__, a __getattr__ hook affects statically absent members rather than automatically invalidating statically present supported ones. See the [storage and dynamic-uncertainty contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#storage-properties-and-dynamic-uncertainty) for presence, read/write, mutability, and hook boundaries.
 
 ## Async policy
 

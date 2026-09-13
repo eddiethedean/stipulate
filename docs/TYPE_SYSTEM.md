@@ -42,6 +42,8 @@ Cross-origin relations require a supported origin inheritance/substitution map, 
 
 This finite origin table does not imply arbitrary user-defined generic specialization. Unknown origins and unsupported recursive forms remain explicit.
 
+For 0.1, the [exact finite table and directional rules](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#supported-types-and-directions) are part of this specification. They enumerate permitted cross-origin substitutions, fixed/variadic tuple relations, bare-container gradual evidence, and the built-in str/bytes/bytearray read-abstraction routes. ClassVar/Final wrappers, Callable annotations, arbitrary parameterized generic subclasses, and unlisted origins are unsupported; supportedness is checked before identity, object, or Any shortcuts. Annotated metadata is retained opaquely without invoking its repr.
+
 ## Members and mutability
 
 A readable member provides a type covariantly. A writable member must also accept the required write type contravariantly. Equal getter and setter types therefore often require invariance. A read-only property cannot satisfy a writable attribute contract.

@@ -32,6 +32,8 @@ Construction compiles the requirement eagerly and raises `ContractDefinitionErro
 
 A contract captures an immutable requirement snapshot. There is no candidate-specific state and no per-contract strictness setting. Strictness is an enforcement decision at each validation call.
 
+The exact initial signatures, argument-validation behavior, namespace overlay rules, inheritance obligations, and candidate boundaries are specified in the [phase 0.1 public contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#public-contract--required-behavior). These details supplement this API model: strict/refresh require actual bool values, namespace keys require strings, and invalid configuration is rejected before compilation or checking. Candidate class objects are unsupported even for an empty contract; ordinary instances satisfy an empty contract without member obligations.
+
 ## Validate
 
 ```python

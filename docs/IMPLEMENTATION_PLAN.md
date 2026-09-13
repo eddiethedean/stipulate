@@ -4,6 +4,8 @@
 
 Deliver an approachable structural-contract library whose type inference, diagnostics, and runtime semantics reinforce each other. ROADMAP.md owns the supported 0.1 matrix. EXPERIENCE_DESIGN.md owns the user journeys and presentation bar. The current repository contains specifications and design probes, not a working package.
 
+For the implementation-ready contract for the entire 0.1 release, use [PHASE_0_1_IMPLEMENTATION_CONTRACT.md](PHASE_0_1_IMPLEMENTATION_CONTRACT.md). Its AC-001 through AC-031 and P1 through P8 refine the slices below without promoting later-release features or resolving implementation gates from documentation alone.
+
 Each slice must demonstrate a complete user task with a positive case, meaningful failure or uncertainty, precise public types, and an executable example. A slice can be deliberately narrow internally; only the complete roadmap matrix is advertised as 0.1 support.
 
 ## Permanent engineering rules

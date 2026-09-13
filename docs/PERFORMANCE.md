@@ -39,6 +39,8 @@ Protect weak-cache lookup and publication with a small lock. Never hold it durin
 
 No exactly-once annotation-evaluation guarantee is made. Compilers retain strong local references while working. Candidate state is per-call. Do not cache exception instances or tracebacks: they retain frames, namespaces, and potentially candidates.
 
+Concurrent successful refreshes use publication/completion order: the last publication wins. Overlapping ordinary construction may reuse either valid snapshot; retained owners are unchanged. External simultaneous mutation of candidate/declaration metadata is not an atomic observation and requires caller synchronization. Snapshot immutability covers normalized declarations and copied namespace bindings, not deep freezing of referenced type objects. See the [phase 0.1 lifecycle contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#snapshots-cache-lifecycle-and-concurrency).
+
 ## Required lifecycle tests
 
 - Repeated validation through one Contract reuses its IR.

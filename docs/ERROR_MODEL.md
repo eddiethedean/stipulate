@@ -12,9 +12,13 @@ Both exception paths exist in 0.1. Do not defer definition errors or use the sup
 
 `ContractDefinitionError` describes an invalid, unresolvable, or unsupported requirement, including the definition phase and declaration location. It can arise during Contract construction or an explicit refresh.
 
+Its read-only fields are code, loc (a tuple), phase, msg, and hint. Phase is declaration/members/annotations/types/inheritance. There is no candidate result; reporting the first deterministic definition failure is sufficient for 0.1. See the [phase 0.1 result/error contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#results-evidence-errors-and-serialization).
+
 `ContractError` means a valid requirement rejected a candidate under the requested enforcement policy. It exposes `.result`, `.strict`, and `.errors()` containing the findings responsible for rejection. In strict mode these can include unknowns; their evidence status remains UNKNOWN rather than being relabeled incompatible.
 
 `CompatibilityResult.errors()` contains incompatible findings only; `.unknowns()` contains unknown findings only. This distinction must be explicit in docstrings because an enforcement exception can include both categories.
+
+ContractError's result and strict fields are read-only. Its errors() returns incompatible findings plus all unknowns rejected in strict mode or non-allowlisted unknowns rejected in permissive mode; allowlisted unknowns are not themselves reasons for permissive rejection. Result/evidence fields and recursively nested context are immutable. Exported loc/ctx structures are recursively independent copies, not merely a fresh outer dictionary.
 
 ## Structured findings
 
@@ -64,6 +68,8 @@ Only suggest strict=False for allowlisted type uncertainty. Unsupported signatur
 ## Aggregation and ordering
 
 Collect independent failures. Order members deterministically, then callable parameters in declaration order, return, and other capabilities. Avoid repeated derivative errors when a member is missing or its signature cannot be recovered. Preserve unassessed dependent obligations in evidence so completeness is accurate.
+
+For 0.1, a missing method is an incompatible presence finding with UNKNOWN dependency_unassessed records for blocked obligations; its result is incomplete. These dependent records appear in unknowns() with a root-location reference in ctx, while plain reports group them visibly. Compact repr counts include the public records; grouped report text distinguishes primary unknowns from the number of blocked obligations. A fully inspected incompatible type relation may be complete.
 
 Render unknown and incompatible findings with different wording. A failure to prove compatibility is not proof that the candidate is wrong.
 

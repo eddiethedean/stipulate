@@ -123,6 +123,7 @@ Start with the [quickstart](docs/QUICKSTART.md). The [experience design](docs/EX
 - [Release and PyPI trusted publishing](docs/RELEASING.md)
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
+- [Phase 0.1 implementation contract](docs/PHASE_0_1_IMPLEMENTATION_CONTRACT.md)
 - [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
 - [Design probes](design_probes/README.md)
 
