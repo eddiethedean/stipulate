@@ -106,8 +106,10 @@ def supported(value: object, active: frozenset[int] = frozenset()) -> bool:
     if any(origin is o for o in (typing.Union, types.UnionType)):
         return bool(args) and all(supported(a, active) for a in args)
     if origin is Literal:
+        primitive_types = (int, bool, str, bytes, type(None))
         return bool(args) and all(
-            type(a) in (int, bool, str, bytes, type(None)) or enum.Enum in class_mro(type(a))
+            any(type(a) is primitive for primitive in primitive_types)
+            or any(base is enum.Enum for base in class_mro(type(a)))
             for a in args
         )
     if any(origin is o for o in ORIGINS):
@@ -258,7 +260,7 @@ def relate(source: object, destination: object) -> Relation:
 def _literal_equal(a: object, b: object) -> bool:
     if type(a) is not type(b):
         return False
-    if enum.Enum in class_mro(type(a)):
+    if any(base is enum.Enum for base in class_mro(type(a))):
         return a is b
     return a == b
 
@@ -292,8 +294,8 @@ def type_label(value: object) -> str | None:
 
 
 def _literal_label(value: object) -> str:
-    if type(value) in (int, bool, str, bytes, type(None)):
+    if any(type(value) is primitive for primitive in (int, bool, str, bytes, type(None))):
         return repr(value)
-    if enum.Enum in class_mro(type(value)):
+    if any(base is enum.Enum for base in class_mro(type(value))):
         return (type_label(type(value)) or "Enum") + " member"
     return "unsupported literal"

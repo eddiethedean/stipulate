@@ -134,6 +134,22 @@ def test_nominal_relation_does_not_execute_subclass_hooks() -> None:
     assert calls == []
 
 
+def test_literal_supportedness_uses_class_identity_without_repr() -> None:
+    class EqualityMeta(type):
+        def __eq__(cls, other: object) -> bool:
+            raise AssertionError("class equality must not run")
+
+        __hash__ = type.__hash__
+
+    class Payload(metaclass=EqualityMeta):
+        def __repr__(self) -> str:
+            raise AssertionError("payload repr must not run")
+
+    value = Literal[Payload()]
+    assert not supported(value)
+    assert relate(value, object).status is S.UNKNOWN
+
+
 def test_nominal_container_subclass_does_not_invent_generic_substitution() -> None:
     class Child(list[int]):
         pass

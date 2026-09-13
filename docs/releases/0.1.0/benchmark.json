@@ -1,7 +1,7 @@
 {
   "release_version": "0.1.0",
-  "runtime_source_digest": "2fc8d117746164aede43751ccdd41f4f18d9c12e3d6e19fab6b1bd84d4640f62",
-  "installed_distribution_sha256": "ef102de7f88059270ee62e411cc1c1a5c491bc2f823f59fa373785247c08dab6",
+  "runtime_source_digest": "a18169eb10cd43e944385e36d551e3ff9f86a4a4416d2d5d09aba4263fa051eb",
+  "installed_distribution_sha256": "e7204504578997b84b199d12c4179bc308b9f43eb8fe371b983a3fccd03d081a",
   "environment": {
     "python": "3.11.15",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -15,52 +15,52 @@
     {
       "workload": "cold_compile",
       "iterations": 100,
-      "seconds": 0.0035074586048722267
+      "seconds": 0.003464832901954651
     },
     {
       "workload": "retained_construction",
       "iterations": 100,
-      "seconds": 8.349958807229996e-05
+      "seconds": 8.295755833387375e-05
     },
     {
       "workload": "compatible_check",
       "iterations": 100,
-      "seconds": 0.01124358456581831
+      "seconds": 0.010751250199973583
     },
     {
       "workload": "incompatible_check",
       "iterations": 100,
-      "seconds": 0.011045791208744049
+      "seconds": 0.010865875519812107
     },
     {
       "workload": "unknown_check",
       "iterations": 100,
-      "seconds": 0.009874749928712845
+      "seconds": 0.00991079118102789
     },
     {
       "workload": "strict_enforcement",
       "iterations": 100,
-      "seconds": 0.010974042117595673
+      "seconds": 0.010541833005845547
     },
     {
       "workload": "permissive_enforcement",
       "iterations": 100,
-      "seconds": 0.010114041157066822
+      "seconds": 0.009821250103414059
     },
     {
       "workload": "temporary_construction",
       "iterations": 100,
-      "seconds": 0.00358691718429327
+      "seconds": 0.003387417644262314
     },
     {
       "workload": "wide_contract",
       "iterations": 5,
-      "seconds": 0.027096958830952644
+      "seconds": 0.025839834474027157
     },
     {
       "workload": "deep_type",
       "iterations": 5,
-      "seconds": 0.09140800032764673
+      "seconds": 0.08860745839774609
     }
   ]
 }

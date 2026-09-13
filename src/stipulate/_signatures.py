@@ -5,10 +5,11 @@ import itertools
 import types
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 from ._annotations import Policy, annotation_map, resolve
 from ._evidence import EvidenceStatus
-from ._relations import Relation, all_of, inspect_missing, relate
+from ._relations import Relation, all_of, class_dict, inspect_missing, is_class, relate
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +22,24 @@ class SignatureCheck:
     routes: tuple[tuple[str, str], ...] = ()
     failed_call: tuple[int, tuple[str, ...]] | None = None
     shape_status: EvidenceStatus = EvidenceStatus.PROVEN
+
+
+def _defining_owner(function: types.FunctionType) -> type[object] | None:
+    """Recover a globally reachable class owner without executing metadata hooks."""
+    qualname = function.__qualname__
+    parts = qualname.split(".")[:-1]
+    if not parts or "<locals>" in parts:
+        return None
+    current = function.__globals__.get(parts[0])
+    if not is_class(current):
+        return None
+    current = cast(type[object], current)
+    for part in parts[1:]:
+        value = class_dict(current).get(part, inspect_missing)
+        if not is_class(value):
+            return None
+        current = cast(type[object], value)
+    return current
 
 
 def exposed_signature(
@@ -73,7 +92,9 @@ def exposed_signature(
         target = wrapped
     policy: Policy = "raw" if raw else "trusted"
     annotations: Mapping[str, object] = {} if explicit_layer else annotation_map(target, policy)
-    if owner is None:
+    if target is not obj:
+        owner = _defining_owner(target) or object
+    elif owner is None:
         owner = object
     params: list[inspect.Parameter] = []
     for p in selected.parameters.values():

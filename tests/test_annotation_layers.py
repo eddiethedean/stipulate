@@ -3,12 +3,28 @@ from __future__ import annotations
 import inspect
 import sys
 import types
-from typing import Protocol
+from functools import wraps
+from typing import Protocol, cast
 
 import pytest
 from tests_support import dynamic_contract, requirement
 
 from stipulate import Contract
+
+
+class WrappedOwner:
+    Local = str
+
+    def f(self) -> "Local":
+        return "text"
+
+
+class WrappedCandidate:
+    Local = int
+
+    @wraps(WrappedOwner.f)
+    def f(self) -> object:
+        return WrappedOwner.f(cast(WrappedOwner, self))
 
 
 def test_inherited_methods_use_their_own_module_and_owner(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -50,6 +66,7 @@ def test_explicit_signature_and_wrapped_layers_do_not_merge_annotations() -> Non
 
     setattr(Candidate.f, "__wrapped__", wrapped)
     assert dynamic_contract(req).check(Candidate()).compatible
+
     # An intermediate override wins, even when the final function disagrees.
     signature = inspect.Signature(
         [
@@ -63,6 +80,17 @@ def test_explicit_signature_and_wrapped_layers_do_not_merge_annotations() -> Non
     assert dynamic_contract(req).check(Candidate()).compatible
     setattr(Candidate.f, "__signature__", signature)
     assert dynamic_contract(req).check(Candidate()).compatible
+
+
+def test_wrapped_annotations_use_the_selected_function_owner() -> None:
+    req = requirement("class Requirement(Protocol):\n def f(self) -> int: ...")
+
+    result = dynamic_contract(req).check(WrappedCandidate())
+
+    assert result.status.value == "incompatible"
+    assert result.complete
+    assert result.errors()[0]["expected"] == "int"
+    assert result.errors()[0]["actual"] == "str"
 
 
 def test_raw_explicit_signature_avoids_all_annotation_factories() -> None:
