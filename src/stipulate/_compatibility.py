@@ -209,19 +209,22 @@ def inspect_candidate(ir: ContractIR, candidate: object) -> CompatibilityResult:
     findings: list[Evidence] = []
     cls = type(candidate)
     lookup, lookup_owner = _lookup(cls, "__getattribute__")
-    builtin_lookup = lookup_owner in (
-        int,
-        bool,
-        float,
-        complex,
-        str,
-        bytes,
-        bytearray,
-        list,
-        set,
-        frozenset,
-        dict,
-        tuple,
+    builtin_lookup = any(
+        lookup_owner is builtin
+        for builtin in (
+            int,
+            bool,
+            float,
+            complex,
+            str,
+            bytes,
+            bytearray,
+            list,
+            set,
+            frozenset,
+            dict,
+            tuple,
+        )
     )
     standard_lookup = lookup is object.__getattribute__ or (
         builtin_lookup
@@ -509,7 +512,7 @@ def _attribute(
         findings.append(_relation((member.name, "read"), relation, code, member.read_type, read))
         findings.extend(_uncertainties((member.name, "read"), relation))
     if member.writable:
-        if write_dynamic and type(raw) is not property:
+        if write_dynamic:
             findings.append(
                 _fact(
                     (member.name, "write"),

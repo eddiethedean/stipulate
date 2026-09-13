@@ -181,6 +181,8 @@ def relate(source: object, destination: object) -> Relation:
         source = type(None)
     if destination is None:
         destination = type(None)
+    if destination is typing.Tuple:
+        destination = tuple
     so, sa = form_parts(source)
     do, da = form_parts(destination)
     if so is Annotated:
@@ -226,12 +228,6 @@ def relate(source: object, destination: object) -> Relation:
         ):
             return unknown("unsupported_type")
         return bad()
-    if destination is typing.Tuple:
-        if source is typing.Tuple:
-            return unknown("gradual_type")
-        return ok() if so is tuple or source is tuple else bad()
-    if source is typing.Tuple:
-        return unknown("gradual_type")
     if not da and do is not tuple:
         return ok()
     # tuple[()] is a fixed empty tuple; a bare tuple erases its length/element type.

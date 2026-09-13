@@ -21,7 +21,14 @@ class Requirement(Protocol):
     def read(self, key: str) -> bytes: ...
 
 
-def wide_read(self: object, *, key: str) -> bytes:
+def wide_read(
+    self: object,
+    *,
+    key: str = "",
+    mode: str = "",
+    limit: int = 0,
+    offset: int = 0,
+) -> bytes:
     return b""
 
 
