@@ -1,0 +1,165 @@
+name: Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_call:
+    inputs:
+      release_phase:
+        description: "Release line being validated, for example 0.1"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-tag:
+    name: Validate release tag
+    if: ${{ inputs.release_phase != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a semantic 0.x tag for this phase
+        env:
+          RELEASE_PHASE: ${{ inputs.release_phase }}
+          TAG_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_prefix="v${RELEASE_PHASE}."
+          case "${TAG_NAME}" in
+            "${expected_prefix}"[0-9]*) ;;
+            *)
+              echo "Expected a ${expected_prefix}X release tag; received ${TAG_NAME}." >&2
+              exit 1
+              ;;
+          esac
+          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must match vX.Y.Z; received ${TAG_NAME}." >&2
+            exit 1
+          fi
+
+  quality:
+    name: Python ${{ matrix.python-version }}
+    needs: release-tag
+    if: ${{ always() && (needs.release-tag.result == 'success' || needs.release-tag.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install verification tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyright==1.1.411" "mypy==1.19.1" "typing_extensions==4.15.0"
+          if [[ -f pyproject.toml ]]; then
+            python -m pip install build
+            python -m pip install -e ".[dev]"
+          fi
+
+      - name: Run the package test suite when available
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        run: python -m pytest -q
+
+      - name: Check the design-stage positive typing probes
+        run: pyright --project design_probes/pyrightconfig.json
+
+      - name: Check the design-stage runtime probes
+        run: python design_probes/runtime_assumptions.py
+
+      - name: Check the positive mypy probes
+        if: ${{ matrix.python-version == '3.11' }}
+        run: >-
+          mypy --strict --enable-incomplete-feature=TypeForm --no-incremental
+          --cache-dir .mypy-cache design_probes/positive.py
+          design_probes/runtime_assumptions.py
+
+      - name: Check the expected negative Pyright probes
+        if: ${{ matrix.python-version == '3.11' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          pyright --project design_probes/pyrightconfig.json design_probes/negative.py --outputjson > pyright-negative.json
+          status=$?
+          set -e
+          test "${status}" -eq 1
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("pyright-negative.json").read_text())
+          diagnostics = [
+              item for item in payload["generalDiagnostics"] if item["severity"] == "error"
+          ]
+          rules = [item["rule"] for item in diagnostics]
+          expected = [
+              "reportAssignmentType",
+              "reportAssignmentType",
+              "reportArgumentType",
+              "reportAssignmentType",
+              "reportArgumentType",
+          ]
+          assert rules == expected, rules
+          assert len(diagnostics) == 5, diagnostics
+          PY
+
+      - name: Check the expected negative mypy probes
+        if: ${{ matrix.python-version == '3.11' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          mypy --strict --enable-incomplete-feature=TypeForm --no-incremental \
+            --cache-dir .mypy-negative-cache design_probes/negative.py \
+            design_probes/legacy_type_parameter.py > mypy-negative.txt 2>&1
+          status=$?
+          set -e
+          test "${status}" -eq 1
+          grep -c ': error:' mypy-negative.txt | grep -qx '6'
+          grep -q '\[type-abstract\]' mypy-negative.txt
+          grep -q '\[arg-type\]' mypy-negative.txt
+
+      - name: Check documentation formatting and local links
+        if: ${{ matrix.python-version == '3.11' }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          paths = [Path("README.md"), *Path("docs").rglob("*.md"), Path("design_probes/README.md")]
+          errors: list[str] = []
+          for path in paths:
+              text = path.read_text()
+              if text.count("```") % 2:
+                  errors.append(f"{path}: unmatched code fence")
+              if any(line != line.rstrip() for line in text.splitlines()):
+                  errors.append(f"{path}: trailing whitespace")
+              prose = re.sub(r"```[^\n]*\n.*?```", "", text, flags=re.S)
+              prose = re.sub(r"`[^`\n]*`", "", prose)
+              for target in re.findall(r"(?<!!)\[[^\]]*\]\(([^)]+)\)", prose):
+                  target = target.split("#", 1)[0]
+                  if target and "://" not in target and not (path.parent / target).exists():
+                      errors.append(f"{path}: missing {target}")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print(f"Checked {len(paths)} Markdown files.")
+          PY

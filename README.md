@@ -120,6 +120,7 @@ Start with the [quickstart](docs/QUICKSTART.md). The [experience design](docs/EX
 - [Competition](docs/COMPETITION.md)
 - [Pydantic Integration](docs/PYDANTIC_INTEGRATION.md)
 - [Roadmap and 0.x release phases](docs/ROADMAP.md)
+- [Release and PyPI trusted publishing](docs/RELEASING.md)
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
