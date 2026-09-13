@@ -25,10 +25,12 @@ class SignatureCheck:
 
 
 def _defining_owner(function: types.FunctionType) -> type[object] | None:
-    """Recover a globally reachable class owner without executing metadata hooks."""
+    """Return object for free functions, None for unavailable class-owner context."""
     qualname = function.__qualname__
     parts = qualname.split(".")[:-1]
-    if not parts or "<locals>" in parts:
+    if not parts or parts[-1] == "<locals>":
+        return object
+    if "<locals>" in parts:
         return None
     current = function.__globals__.get(parts[0])
     if not is_class(current):
@@ -93,7 +95,7 @@ def exposed_signature(
     policy: Policy = "raw" if raw else "trusted"
     annotations: Mapping[str, object] = {} if explicit_layer else annotation_map(target, policy)
     if target is not obj:
-        owner = _defining_owner(target) or object
+        owner = _defining_owner(target)
     elif owner is None:
         owner = object
     params: list[inspect.Parameter] = []

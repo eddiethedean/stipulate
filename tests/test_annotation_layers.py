@@ -9,7 +9,7 @@ from typing import Protocol, cast
 import pytest
 from tests_support import dynamic_contract, requirement
 
-from stipulate import Contract
+from stipulate import Contract, ContractDefinitionError, ContractError
 
 
 class WrappedOwner:
@@ -91,6 +91,105 @@ def test_wrapped_annotations_use_the_selected_function_owner() -> None:
     assert result.complete
     assert result.errors()[0]["expected"] == "int"
     assert result.errors()[0]["actual"] == "str"
+
+
+@pytest.mark.parametrize(
+    ("annotation", "expected"),
+    [("Local", int), ("'Local'", int), (types.GenericAlias(list, ("Local",)), list[int])],
+)
+def test_unavailable_wrapped_owner_cannot_resolve_against_conflicting_globals(
+    annotation: object, expected: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    class Original:
+        Local = str
+
+        def f(self) -> object:
+            calls.append("operation")
+            raise AssertionError("not executed")
+
+    Original.f.__annotations__ = {"return": annotation}
+    monkeypatch.setitem(Original.f.__globals__, "Local", int)
+
+    class Candidate:
+        @wraps(Original.f)
+        def f(self) -> object:
+            raise AssertionError("not executed")
+
+    req = requirement(
+        "class Requirement(Protocol):\n def f(self) -> Expected: ...", {"Expected": expected}
+    )
+    contract = dynamic_contract(req)
+    candidate = Candidate()
+    result = contract.check(candidate)
+    assert result.status.value == "unknown" and not result.complete
+    assert result.unknowns()[0]["type"] == "annotation_unresolved"
+    for strict in (True, False):
+        assert not result.accepted(strict=strict)
+        with pytest.raises(ContractError):
+            contract.validate(candidate, strict=strict)
+    assert calls == []
+
+
+def test_wrapped_owner_selection_does_not_invoke_metaclass_truthiness() -> None:
+    namespace: dict[str, object] = {}
+    exec(
+        "from functools import wraps\nLocal=int\ncalls=[]\n"
+        "class Meta(type):\n def __bool__(cls):\n  calls.append('bool')\n  return False\n"
+        "class Original(metaclass=Meta):\n Local=str\n def f(self) -> 'Local': ...\n"
+        "class Candidate:\n @wraps(Original.f)\n def f(self): ...\n",
+        namespace,
+    )
+    candidate = cast(type[object], namespace["Candidate"])()
+    req = requirement("class Requirement(Protocol):\n def f(self) -> int: ...")
+    result = dynamic_contract(req).check(candidate)
+    assert namespace["calls"] == []
+    assert result.status.value == "incompatible" and result.complete
+    assert result.errors()[0]["actual"] == "str"
+
+
+def test_explicit_requirement_locals_resolve_an_unavailable_wrapped_owner() -> None:
+    class Original:
+        def f(self) -> object:
+            raise AssertionError("not executed")
+
+    Original.f.__annotations__ = {"return": "Local"}
+    req = requirement(
+        "class Requirement(Protocol):\n @decorator\n def f(self): ...",
+        {"decorator": wraps(Original.f)},
+    )
+    with pytest.raises(ContractDefinitionError) as error:
+        dynamic_contract(req)
+    assert error.value.code == "annotation_unresolved"
+
+    class Candidate:
+        def f(self) -> str:
+            raise AssertionError("not executed")
+
+    assert dynamic_contract(req, localns={"Local": str}).check(Candidate()).compatible
+
+
+def test_unavailable_wrapped_owner_preserves_independent_parameter_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Original:
+        def f(self, x: str) -> object:
+            raise AssertionError("not executed")
+
+    Original.f.__annotations__ = {"x": str, "return": "Local"}
+    monkeypatch.setitem(Original.f.__globals__, "Local", int)
+
+    class Candidate:
+        @wraps(Original.f)
+        def f(self, x: str) -> object:
+            raise AssertionError("not executed")
+
+    req = requirement("class Requirement(Protocol):\n def f(self, x:int) -> int: ...")
+    result = dynamic_contract(req).check(Candidate())
+    assert result.status.value == "incompatible" and not result.complete
+    assert result.errors()[0]["loc"] == ["f", "x"]
+    assert result.unknowns()[0]["type"] == "annotation_unresolved"
 
 
 def test_raw_explicit_signature_avoids_all_annotation_factories() -> None:
