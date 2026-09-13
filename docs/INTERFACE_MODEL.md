@@ -1,6 +1,6 @@
 # Public Interface Model
 
-## Planned 0.1 API
+## 0.1 API
 
 Use standard Protocol declarations and a reusable contract object:
 

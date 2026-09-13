@@ -1,0 +1,4 @@
+include uv.lock
+recursive-include docs *.md *.json
+recursive-include tools *.py *.json
+recursive-include tests *.py

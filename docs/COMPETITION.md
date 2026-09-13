@@ -2,7 +2,7 @@
 
 ## Scope
 
-This is a positioning document, not a verified exhaustive feature ranking. Stipulate is currently a design-stage project. Planned capabilities must not be compared as shipped advantages against other projects.
+This is a positioning document, not a verified exhaustive feature ranking. Stipulate's initial implementation is in progress and its release gates remain authoritative. Planned or unsupported capabilities must not be compared as shipped advantages against other projects.
 
 Its intended focus is explicit Python structural contracts: check a dynamically supplied implementation, explain incompatible and unknown evidence, and eventually compare contract evolution with the same underlying rules.
 

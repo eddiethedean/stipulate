@@ -2,7 +2,7 @@
 
 ## Runtime targets
 
-Planned minimum: CPython 3.11, with requires-python >=3.11 in future package metadata. The initial release test targets are CPython 3.11, 3.12, 3.13, and 3.14. This design checkout does not yet claim tested Stipulate support on any of them.
+Minimum package metadata is CPython 3.11 (`requires-python >=3.11`). The test targets are CPython 3.11, 3.12, 3.13, and 3.14. The implementation report records full runtime and installed-consumer verification; release approval additionally requires independent review.
 
 Advertise a minor version only after compilation, annotation resolution, signature normalization, supported type relations, evidence, lifecycle, and installed-package tests pass. Import success is insufficient. PyPy and other implementations are outside the initial support claim.
 

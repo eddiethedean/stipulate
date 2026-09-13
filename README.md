@@ -8,7 +8,9 @@ Stipulate checks dynamically supplied implementations against Python structural 
 
 ## Status
 
-This repository contains the design specification and small design probes. It does not yet contain an installable Stipulate implementation. The examples below describe the planned 0.1 API. Earlier prototypes are historical inputs, not evidence that release gates have passed.
+This repository contains the Stipulate 0.1 implementation, design specification, and design probes. The core API checks declared Protocol compatibility without executing candidate operations. Earlier prototypes are historical inputs, not release evidence.
+
+Install with `python -m pip install .` (CPython 3.11–3.14). See the [implemented feature guide](docs/IMPLEMENTED_0_1.md) for the supported boundary. Independent Sol review is still required before release approval.
 
 ## Define and validate
 
@@ -66,16 +68,18 @@ Stipulate compares signatures, annotation assignability, binding, and supported 
 ## Friendly errors
 
 ```text
-2 contract errors for Storage
+Incompatible with Storage
+2 incompatible findings; 0 unknown findings (0 blocked obligations).
 
 read.key
-  Parameter is too narrow: the contract permits str, but the implementation accepts bytes.
-  Accept str (or a compatible broader type).
-  [parameter_type]
+  The implementation input is too narrow for required caller values
+  Required: str
+  Provided: bytes
+  [parameter_type; incompatible]
 
-write
-  A coroutine method is required, but the implementation is synchronous.
-  [async_mismatch]
+write.kind
+  The coroutine execution kind differs
+  [async_mismatch; incompatible]
 ```
 
 ## Interface shorthand — experimental design target

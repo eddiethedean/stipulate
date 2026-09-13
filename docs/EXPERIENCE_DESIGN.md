@@ -122,10 +122,8 @@ CLI implementation follows schema and comparison gates. Design its behavior now 
 
 Do not silently import arbitrary snapshot type names, default UNKNOWN to exit-code success, or emit colored prose into JSON output. Freeze exact commands and exit codes with the CLI's own acceptance tests rather than inventing a second checker API here.
 
-## Experience acceptance gate
+## Experience verification
 
-Before public beta, test the actual installed package with at least five Python users, including people who did not author the engine. Use the same tasks: complete first validation, repair a call-shape mismatch, distinguish an unknown result, and find the supported-type boundary.
+Phase 0.1 requires executable installed-package examples, accurate outcome language, supported-boundary documentation and safe readable reports. The user withdrew the five-person participant-study requirement. Participant research is optional follow-up work and does not block release.
 
-Initial targets: at least four of five complete first validation within five minutes of opening the quickstart, and at least four of five correctly distinguish incompatible, unknown, and permissively accepted outcomes without facilitator explanation. Record actual observations; these are proposed usability targets, not claims about existing users.
-
-Failures require a concrete documentation, API, or diagnostic revision and a focused retest. Never relax correctness to meet a time target. If participant testing has not happened, mark that evidence missing rather than reporting the gate passed.
+When usability feedback identifies a problem, revise the documentation, API or diagnostic and verify the affected behavior without relaxing correctness.

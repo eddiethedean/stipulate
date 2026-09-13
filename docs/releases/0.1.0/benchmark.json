@@ -1,0 +1,66 @@
+{
+  "release_version": "0.1.0",
+  "runtime_source_digest": "069f51c9ec7343bbe14f854adcd80ee9ae85f926553f28c22e4a78dafecabbaa",
+  "installed_distribution_sha256": "814ec67ff212033d5d346490077936e10ddfb9c1b422b8663bf8dc4dca7662ba",
+  "environment": {
+    "python": "3.11.15",
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "typing_extensions": "4.15.0",
+    "timer": "time.perf_counter",
+    "aggregation": "total seconds per workload"
+  },
+  "tasks": "Cold/retained/temporary construction; three outcomes; enforcement; 50 members; ten nested invariant lists.",
+  "measurements": [
+    {
+      "workload": "cold_compile",
+      "iterations": 100,
+      "seconds": 0.0034740837290883064
+    },
+    {
+      "workload": "retained_construction",
+      "iterations": 100,
+      "seconds": 8.254218846559525e-05
+    },
+    {
+      "workload": "compatible_check",
+      "iterations": 100,
+      "seconds": 0.007480708882212639
+    },
+    {
+      "workload": "incompatible_check",
+      "iterations": 100,
+      "seconds": 0.007469499483704567
+    },
+    {
+      "workload": "unknown_check",
+      "iterations": 100,
+      "seconds": 0.005482208915054798
+    },
+    {
+      "workload": "strict_enforcement",
+      "iterations": 100,
+      "seconds": 0.0076867081224918365
+    },
+    {
+      "workload": "permissive_enforcement",
+      "iterations": 100,
+      "seconds": 0.005739250220358372
+    },
+    {
+      "workload": "temporary_construction",
+      "iterations": 100,
+      "seconds": 0.0032232506200671196
+    },
+    {
+      "workload": "wide_contract",
+      "iterations": 5,
+      "seconds": 0.01827349979430437
+    },
+    {
+      "workload": "deep_type",
+      "iterations": 5,
+      "seconds": 0.08437041658908129
+    }
+  ]
+}

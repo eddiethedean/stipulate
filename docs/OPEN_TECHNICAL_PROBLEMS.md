@@ -695,7 +695,7 @@ OTP-013, OTP-022
 
 **Status:** Open; presentation specification and illustrative scenarios selected
 
-**Release target:** 0.1 presentation; observed usability gate before public beta
+**Release target:** 0.1 presentation; installed examples and report verification
 
 ### Problem
 
@@ -703,7 +703,7 @@ Accurate findings are insufficient if users cannot understand the failed operati
 
 ### Selected policy
 
-EXPERIENCE_DESIGN.md owns user journeys, result language, plain-text rendering, progressive disclosure, and usability targets. Result rendering is a pure view over evidence. The 0.1 UI is the Python API, editor types, reports, and documentation; a separate dashboard is not planned.
+EXPERIENCE_DESIGN.md owns user journeys, result language, plain-text rendering, progressive disclosure, and optional usability research. Result rendering is a pure view over evidence. The 0.1 UI is the Python API, editor types, reports, and documentation; a separate dashboard is not planned.
 
 ### Acceptance tests
 
@@ -712,7 +712,7 @@ EXPERIENCE_DESIGN.md owns user journeys, result language, plain-text rendering, 
 - Verify plain str/repr output, no hidden logging or candidate repr calls, control-character escaping, and readable 60/80-column output.
 - Use symbolic call-shape counterexamples only when established without candidate execution.
 - Type-check and execute the quickstart against the installed package; a design stub does not satisfy execution.
-- Run the five-participant usability exercise and record observed results before declaring the beta experience gate passed.
+- Participant research is optional and does not block the phase 0.1 beta experience gate.
 
 ### Related work
 

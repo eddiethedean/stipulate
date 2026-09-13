@@ -4,7 +4,7 @@
 
 Deliver an approachable structural-contract library whose type inference, diagnostics, and runtime semantics reinforce each other. ROADMAP.md owns the supported 0.1 matrix. EXPERIENCE_DESIGN.md owns the user journeys and presentation bar. The current repository contains specifications and design probes, not a working package.
 
-For the implementation-ready contract for the entire 0.1 release, use [PHASE_0_1_IMPLEMENTATION_CONTRACT.md](PHASE_0_1_IMPLEMENTATION_CONTRACT.md). Its AC-001 through AC-031 and P1 through P8 refine the slices below without promoting later-release features or resolving implementation gates from documentation alone.
+For the implementation-ready contract for the entire 0.1 release, use [PHASE_0_1_IMPLEMENTATION_CONTRACT.md](PHASE_0_1_IMPLEMENTATION_CONTRACT.md). Its active AC-001 through AC-029 plus AC-031 (AC-030 withdrawn) and P1 through P8 refine the slices below without promoting later-release features or resolving implementation gates from documentation alone.
 
 Each slice must demonstrate a complete user task with a positive case, meaningful failure or uncertainty, precise public types, and an executable example. A slice can be deliberately narrow internally; only the complete roadmap matrix is advertised as 0.1 support.
 
@@ -86,15 +86,15 @@ Add weak keys and weak IR values in the shared cache, snapshot refresh, custom-n
 
 Complete all roadmap rows and run the scenario catalogue against real engine results. Check 60/80-column reports, long identifiers, terminal-control escaping, color-independent meaning, compact repr, and no implicit logging. Publish exact checker configuration and known limitations alongside the quickstart.
 
-Conduct the five-participant task exercise in EXPERIENCE_DESIGN.md. Record observed completion and interpretation results; missing participant evidence is not a passed gate. Fix the failing interaction and retest it without weakening compatibility policy.
+Participant testing is optional follow-up work and does not block phase 0.1. Fix demonstrated documentation or diagnostic issues without weakening compatibility policy.
 
-**Evidence to review:** Actual task observations, diagnostic examples, full-matrix CI, installed-package documentation execution, and a supported/unsupported feature inventory.
+**Evidence to review:** Diagnostic examples, full-matrix CI, installed-package documentation execution, and a supported/unsupported feature inventory.
 
 **Exit gate:** All 0.1 semantic gates and OTP-029's beta experience criteria pass. There are no known cases where a supported incompatible declaration is accepted or unsupported evidence is presented as established compatibility.
 
 ## Slice 8 — 0.1 release decision
 
-Review one release evidence bundle containing the feature matrix, exact runtime/checker versions, conformance results, example runs, lifecycle tests, performance measurements, usability observations, and documented remaining limits.
+Review one release evidence bundle containing the feature matrix, exact runtime/checker versions, conformance results, example runs, lifecycle tests, performance measurements, and documented remaining limits.
 
 Every advertised feature must trace to tests. Any unresolved release-blocking correctness or experience issue blocks publication; move scope explicitly in the roadmap and focused documents if needed. A screenshot, happy-path demo, or internal module completion is not a release gate.
 

@@ -1,0 +1,7 @@
+# Independent semantic corpus
+
+The call partition oracle generates inert Python functions and invokes Python's language binder. It does not mirror the engine's routing implementation or execute plugin functions. Regression cases include optional omission, positional-only spelling inside **kwargs, duplicate assignment, candidate-required extras, and routing into variadic declarations.
+
+Semantic references are the primary typing specification's [callable assignability](https://typing.python.org/en/latest/spec/callables.html#assignability-rules-for-callables), [Protocol inheritance](https://typing.python.org/en/latest/spec/protocol.html), [gradual types](https://typing.python.org/en/latest/spec/concepts.html), [Literal rules](https://typing.python.org/en/latest/spec/literal.html), and [TypeForm](https://typing.python.org/en/latest/spec/type-forms.html). test_type_table.py records explicit expected directional relations independently of presentation. Installed positive/negative fixtures test both pinned checkers.
+
+Stipulate deliberately adds strict proof requirements, explicit coroutine execution-kind matching, storage presence independent of annotations, no operation/descriptor execution, and a bounded type table. These policies can be stricter than static assignment: missing annotations/Any remain unknown, overloads/generics remain unsupported, and a synchronous wrapper does not inherit a wrapped coroutine's visible execution kind. Runtime tests assert these differences rather than treating checker success as behavioral proof.

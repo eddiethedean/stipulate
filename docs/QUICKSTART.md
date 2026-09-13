@@ -1,6 +1,6 @@
 # Quickstart
 
-This guide describes the planned 0.1 API. Stipulate is not implemented or published by this repository yet. Installation instructions will be added when a verified distribution is available.
+This guide describes the implemented 0.1 API. Install the local project with `python -m pip install .` or use a built wheel. The tested runtime targets are CPython 3.11–3.14; other implementations and future versions are not implied support.
 
 ## Define a capability
 
@@ -26,7 +26,7 @@ reader = reader_contract.validate(candidate)
 assert reader is candidate
 ```
 
-The inferred type of reader is Reader. No inheritance, implementation decorator, or registration is needed. The [typing guide](STATIC_TYPING.md) records the tested TypeForm-compatible checker versions and the mypy feature flag currently required by the design probe.
+The inferred type of reader is Reader. No inheritance, implementation decorator, or registration is needed. The [typing guide](STATIC_TYPING.md) records the tested TypeForm-compatible checker versions and the mypy feature flag used by installed consumers.
 
 ## Understand a mismatch
 
@@ -42,17 +42,16 @@ result = reader_contract.check(BinaryReader())
 print(result)
 ```
 
-Planned output:
+The report identifies the required and provided directions:
 
 ```text
 Incompatible with Reader
-1 incompatible finding
+1 incompatible findings; 0 unknown findings (0 blocked obligations).
 
 read.key
-  Callers may pass str; the implementation declares bytes.
+  The implementation input is too narrow for required caller values
   Required: str
   Provided: bytes
-  Update the implementation to accept str, or correct its annotation if it already does.
   [parameter_type; incompatible]
 ```
 

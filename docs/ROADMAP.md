@@ -12,7 +12,7 @@ The other planning documents have narrower authority:
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) orders the engineering slices inside a release.
 - [EXPERIENCE_DESIGN.md](EXPERIENCE_DESIGN.md) defines the user experience and usability bar.
 
-The repository is currently design-stage. The design probes are useful evidence about typing and Python behavior, but no 0.x release claim is complete until the actual installed package passes the gates below.
+The repository now contains an initial implementation alongside the design probes. The probes are useful evidence about typing and Python behavior, but no 0.x release claim is complete until the installed package passes every gate below.
 
 ## Release principles
 
@@ -87,7 +87,7 @@ General user-defined generics, overloads, nested Protocol annotations, `Self`, a
 
 ### Exit gate
 
-The exact 0.1 gate is the intersection of the feature matrix above and the release-blocking OTPs listed in [OPEN_TECHNICAL_PROBLEMS.md](OPEN_TECHNICAL_PROBLEMS.md). The quickstart and report scenarios must run against the real package. Pyright strict, the supported mypy configuration, CPython 3.11–3.14 tests, lifecycle tests, and the initial usability exercise must pass.
+The exact 0.1 gate is the intersection of the feature matrix above and the release-blocking OTPs listed in [OPEN_TECHNICAL_PROBLEMS.md](OPEN_TECHNICAL_PROBLEMS.md). The quickstart and report scenarios must run against the real package. Pyright strict, the supported mypy configuration, CPython 3.11–3.14 tests, and lifecycle tests must pass.
 
 ## 0.2 — Production-boundary hardening
 
@@ -106,7 +106,7 @@ A framework author can keep one Contract instance for repeated plugin checks and
 
 ### Exit gate
 
-No known retention path through cache values, failed compilation tracebacks, or annotation graphs; concurrent first-use and refresh tests pass; the quickstart task and the five-person usability exercise are repeatable on the installed package; benchmark trends are recorded without turning them into unsupported guarantees.
+No known retention path through cache values, failed compilation tracebacks, or annotation graphs; concurrent first-use and refresh tests pass; the quickstart task runs against the installed package; benchmark trends are recorded without turning them into unsupported guarantees.
 
 ## 0.3 — Ordinary typing and member expansion
 
