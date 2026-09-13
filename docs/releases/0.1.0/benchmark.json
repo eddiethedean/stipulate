@@ -1,7 +1,7 @@
 {
   "release_version": "0.1.0",
-  "runtime_source_digest": "6891980ebb16cfe743cde282bc3f65c099b41213b490b9aaa45bd53542504fce",
-  "installed_distribution_sha256": "ca43c9c889fb425e4002d8aa728ea7b6738e0536637fcf445e6207b589f8fc92",
+  "runtime_source_digest": "3838b50c3d6e0daa1dd8e332ea39adceadf93e9040627fbfc60db328e22d04ee",
+  "installed_distribution_sha256": "c7eeaf0bf01b205a785a7d2da1c6f32cfa6d2cdeb449f570b7d28e8cdb52543c",
   "environment": {
     "python": "3.11.15",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -15,52 +15,52 @@
     {
       "workload": "cold_compile",
       "iterations": 100,
-      "seconds": 0.003310958854854107
+      "seconds": 0.0036524999886751175
     },
     {
       "workload": "retained_construction",
       "iterations": 100,
-      "seconds": 7.591675966978073e-05
+      "seconds": 8.779112249612808e-05
     },
     {
       "workload": "compatible_check",
       "iterations": 100,
-      "seconds": 0.010735457763075829
+      "seconds": 0.010990167036652565
     },
     {
       "workload": "incompatible_check",
       "iterations": 100,
-      "seconds": 0.011063874699175358
+      "seconds": 0.01126325037330389
     },
     {
       "workload": "unknown_check",
       "iterations": 100,
-      "seconds": 0.010163290426135063
+      "seconds": 0.009820832870900631
     },
     {
       "workload": "strict_enforcement",
       "iterations": 100,
-      "seconds": 0.010823125019669533
+      "seconds": 0.01105779130011797
     },
     {
       "workload": "permissive_enforcement",
       "iterations": 100,
-      "seconds": 0.01011616736650467
+      "seconds": 0.01036116760224104
     },
     {
       "workload": "temporary_construction",
       "iterations": 100,
-      "seconds": 0.003459583967924118
+      "seconds": 0.003692292608320713
     },
     {
       "workload": "wide_contract",
       "iterations": 5,
-      "seconds": 0.026033665984869003
+      "seconds": 0.026546457782387733
     },
     {
       "workload": "deep_type",
       "iterations": 5,
-      "seconds": 0.09019037429243326
+      "seconds": 0.09250462520867586
     }
   ]
 }

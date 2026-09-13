@@ -24,6 +24,24 @@ class SignatureCheck:
     shape_status: EvidenceStatus = EvidenceStatus.PROVEN
 
 
+def _exposes_function(value: object, function: types.FunctionType) -> bool:
+    """Authenticate a static member's function identity without binding it."""
+    if type(value) is property:
+        return any(
+            _exposes_function(accessor, function)
+            for accessor in (value.fget, value.fset, value.fdel)
+        )
+    seen: set[int] = set()
+    while type(value) is types.FunctionType:
+        if value is function:
+            return True
+        if id(value) in seen:
+            return False
+        seen.add(id(value))
+        value = inspect.getattr_static(value, "__wrapped__", None)
+    return False
+
+
 def _defining_owner(function: types.FunctionType) -> type[object] | None:
     """Return object for free functions, None for unavailable class-owner context."""
     qualname = function.__qualname__
@@ -41,7 +59,13 @@ def _defining_owner(function: types.FunctionType) -> type[object] | None:
         if not is_class(value):
             return None
         current = cast(type[object], value)
-    return current
+    # A qualified name supplies a lookup route, not proof of ownership: its
+    # global class binding may have been replaced since the function was made.
+    return (
+        current
+        if any(_exposes_function(value, function) for value in class_dict(current).values())
+        else None
+    )
 
 
 def exposed_signature(
