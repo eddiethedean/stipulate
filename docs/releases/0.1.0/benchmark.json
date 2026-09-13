@@ -1,7 +1,7 @@
 {
   "release_version": "0.1.0",
-  "runtime_source_digest": "3838b50c3d6e0daa1dd8e332ea39adceadf93e9040627fbfc60db328e22d04ee",
-  "installed_distribution_sha256": "c7eeaf0bf01b205a785a7d2da1c6f32cfa6d2cdeb449f570b7d28e8cdb52543c",
+  "runtime_source_digest": "4d212005ff5f6e1f2774f21edf8d268bd8090c0ebeacc0cfcf2ea0be855fa8c3",
+  "installed_distribution_sha256": "61c687bb2ff0d92ff0c30673ee7c8fbb0ffc68d609119c9bd68d19e11a06fe33",
   "environment": {
     "python": "3.11.15",
     "platform": "macOS-26.5.2-arm64-arm-64bit",
@@ -15,52 +15,52 @@
     {
       "workload": "cold_compile",
       "iterations": 100,
-      "seconds": 0.0036524999886751175
+      "seconds": 0.003950540907680988
     },
     {
       "workload": "retained_construction",
       "iterations": 100,
-      "seconds": 8.779112249612808e-05
+      "seconds": 9.383261203765869e-05
     },
     {
       "workload": "compatible_check",
       "iterations": 100,
-      "seconds": 0.010990167036652565
+      "seconds": 0.011516459286212921
     },
     {
       "workload": "incompatible_check",
       "iterations": 100,
-      "seconds": 0.01126325037330389
+      "seconds": 0.0111887501552701
     },
     {
       "workload": "unknown_check",
       "iterations": 100,
-      "seconds": 0.009820832870900631
+      "seconds": 0.009823000058531761
     },
     {
       "workload": "strict_enforcement",
       "iterations": 100,
-      "seconds": 0.01105779130011797
+      "seconds": 0.010475167073309422
     },
     {
       "workload": "permissive_enforcement",
       "iterations": 100,
-      "seconds": 0.01036116760224104
+      "seconds": 0.009707875549793243
     },
     {
       "workload": "temporary_construction",
       "iterations": 100,
-      "seconds": 0.003692292608320713
+      "seconds": 0.003437667153775692
     },
     {
       "workload": "wide_contract",
       "iterations": 5,
-      "seconds": 0.026546457782387733
+      "seconds": 0.02569908369332552
     },
     {
       "workload": "deep_type",
       "iterations": 5,
-      "seconds": 0.09250462520867586
+      "seconds": 0.08773454185575247
     }
   ]
 }

@@ -9,7 +9,7 @@ from typing import cast
 
 from ._annotations import Policy, annotation_map, resolve
 from ._evidence import EvidenceStatus
-from ._relations import Relation, all_of, class_dict, inspect_missing, is_class, relate
+from ._relations import Relation, all_of, inspect_missing, is_class, relate
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,48 +24,26 @@ class SignatureCheck:
     shape_status: EvidenceStatus = EvidenceStatus.PROVEN
 
 
-def _exposes_function(value: object, function: types.FunctionType) -> bool:
-    """Authenticate a static member's function identity without binding it."""
-    if type(value) is property:
-        return any(
-            _exposes_function(accessor, function)
-            for accessor in (value.fget, value.fset, value.fdel)
-        )
-    seen: set[int] = set()
-    while type(value) is types.FunctionType:
-        if value is function:
-            return True
-        if id(value) in seen:
-            return False
-        seen.add(id(value))
-        value = inspect.getattr_static(value, "__wrapped__", None)
-    return False
-
-
 def _defining_owner(function: types.FunctionType) -> type[object] | None:
     """Return object for free functions, None for unavailable class-owner context."""
-    qualname = function.__qualname__
-    parts = qualname.split(".")[:-1]
+    # functools.wraps copies __qualname__, but the code retains the selected
+    # function's lexical origin. A global lookup or member identity cannot prove
+    # ownership: a replacement class can expose even the exact original function.
+    code = function.__code__
+    parts = code.co_qualname.split(".")[:-1]
     if not parts or parts[-1] == "<locals>":
         return object
-    if "<locals>" in parts:
-        return None
-    current = function.__globals__.get(parts[0])
-    if not is_class(current):
-        return None
-    current = cast(type[object], current)
-    for part in parts[1:]:
-        value = class_dict(current).get(part, inspect_missing)
-        if not is_class(value):
-            return None
-        current = cast(type[object], value)
-    # A qualified name supplies a lookup route, not proof of ownership: its
-    # global class binding may have been replaced since the function was made.
-    return (
-        current
-        if any(_exposes_function(value, function) for value in class_dict(current).values())
-        else None
-    )
+    # Python records the declaring class in this cell when a method references
+    # __class__ (including zero-argument super). Reading it executes no user code
+    # and remains valid after rebinding globals or installing the method elsewhere.
+    for name, cell in zip(code.co_freevars, function.__closure__ or ()):
+        if name == "__class__":
+            try:
+                owner = cell.cell_contents
+            except ValueError:  # An empty cell supplies no provenance.
+                return None
+            return cast(type[object], owner) if is_class(owner) else None
+    return None
 
 
 def exposed_signature(

@@ -82,15 +82,14 @@ def test_explicit_signature_and_wrapped_layers_do_not_merge_annotations() -> Non
     assert dynamic_contract(req).check(Candidate()).compatible
 
 
-def test_wrapped_annotations_use_the_selected_function_owner() -> None:
+def test_wrapped_annotations_cannot_infer_owner_from_a_global_class_binding() -> None:
     req = requirement("class Requirement(Protocol):\n def f(self) -> int: ...")
 
     result = dynamic_contract(req).check(WrappedCandidate())
 
-    assert result.status.value == "incompatible"
-    assert result.complete
-    assert result.errors()[0]["expected"] == "int"
-    assert result.errors()[0]["actual"] == "str"
+    assert result.status.value == "unknown" and not result.complete
+    assert result.unknowns()[0]["type"] == "annotation_unresolved"
+    assert not result.accepted(strict=True) and not result.accepted(strict=False)
 
 
 @pytest.mark.parametrize(
@@ -132,12 +131,14 @@ def test_unavailable_wrapped_owner_cannot_resolve_against_conflicting_globals(
     assert calls == []
 
 
-def test_wrapped_owner_selection_does_not_invoke_metaclass_truthiness() -> None:
+@pytest.mark.parametrize("class_cell", [False, True])
+def test_wrapped_owner_selection_does_not_invoke_metaclass_truthiness(class_cell: bool) -> None:
     namespace: dict[str, object] = {}
+    body = "return __class__.Local" if class_cell else "..."
     exec(
         "from functools import wraps\nLocal=int\ncalls=[]\n"
         "class Meta(type):\n def __bool__(cls):\n  calls.append('bool')\n  return False\n"
-        "class Original(metaclass=Meta):\n Local=str\n def f(self) -> 'Local': ...\n"
+        "class Original(metaclass=Meta):\n Local=str\n def f(self) -> 'Local': " + body + "\n"
         "class Candidate:\n @wraps(Original.f)\n def f(self): ...\n",
         namespace,
     )
@@ -145,8 +146,13 @@ def test_wrapped_owner_selection_does_not_invoke_metaclass_truthiness() -> None:
     req = requirement("class Requirement(Protocol):\n def f(self) -> int: ...")
     result = dynamic_contract(req).check(candidate)
     assert namespace["calls"] == []
-    assert result.status.value == "incompatible" and result.complete
-    assert result.errors()[0]["actual"] == "str"
+    if class_cell:
+        assert result.status.value == "incompatible" and result.complete
+        assert result.errors()[0]["actual"] == "str"
+    else:
+        assert result.status.value == "unknown" and not result.complete
+        assert result.unknowns()[0]["type"] == "annotation_unresolved"
+    assert not result.accepted(strict=True) and not result.accepted(strict=False)
 
 
 def test_explicit_requirement_locals_resolve_an_unavailable_wrapped_owner() -> None:

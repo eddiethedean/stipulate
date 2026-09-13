@@ -56,6 +56,8 @@ Compile ordinary resolvable string annotations and legacy aliases under the sele
 
 Local-scope namespaces cannot always be recovered. Provide explicit namespace mappings as an advanced constructor option and test ownership/cache behavior. TYPE_CHECKING-only imports are not automatically imported to make evaluation succeed.
 
+After wrapper traversal, a selected class-defined function needs recorded declaring-owner context to resolve names against class locals. The FINAL-001 decision in the [implementation contract](PHASE_0_1_IMPLEMENTATION_CONTRACT.md#annotations-and-trust-boundaries) uses its compiler-created `__class__` closure when present and otherwise reports unresolved annotation evidence. Current global class names and member/wrapper identity are insufficient. This limitation also applies to ordinary decorators: materialized types remain usable, and explicit requirement `localns` can resolve names, but candidate constructor-namespace overrides are not provided.
+
 PEP 695 aliases, recursive aliases, nested Protocol types, user-defined generics, Self, overloads, ParamSpec, Concatenate, TypeVarTuple, Unpack, and typed kwargs remain separately gated. A newer interpreter does not automatically enable those semantics.
 
 ## Sources
