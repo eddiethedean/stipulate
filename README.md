@@ -119,7 +119,7 @@ Start with the [quickstart](docs/QUICKSTART.md). The [experience design](docs/EX
 - [Dependencies](docs/DEPENDENCIES.md)
 - [Competition](docs/COMPETITION.md)
 - [Pydantic Integration](docs/PYDANTIC_INTEGRATION.md)
-- [Roadmap and release matrix](docs/ROADMAP.md)
+- [Roadmap and 0.x release phases](docs/ROADMAP.md)
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
 - [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
