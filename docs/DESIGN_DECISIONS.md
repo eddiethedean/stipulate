@@ -1,164 +1,101 @@
 # Design Decisions
 
-This document records the architectural decisions that should remain stable unless new evidence justifies changing them.
+These decisions own durable policy. ROADMAP.md owns release scope and focused specifications define behavior. The open-problem register records whether implementation acceptance tests have passed. Selecting a policy does not resolve its implementation gate.
 
-## D001 — Package name: Stipulate
+## D001 — Name and purpose
 
-**Decision:** The Python package and project are named `stipulate` / Stipulate.
+Stipulate checks structural interface contracts against available runtime declarations. The package is stipulate. “Contract” does not mean executed preconditions, postconditions, or business invariants.
 
-**Rationale:** The name describes explicit behavioral conditions and contracts without tying the project to one implementation mechanism.
+## D002 — Method-based 0.1 API
 
----
+The supported 0.1 declaration path is standard Protocol plus Contract(Protocol). Users call contract.validate() and contract.check(). This supersedes earlier plans making Interface shorthand the mandatory first release syntax.
 
-## D002 — Use normal class syntax
+The shorthand class Foo(Interface) with Foo.validate() remains an experimental goal gated on complete runtime and checker evidence.
 
-**Decision:** The primary declaration form is:
+## D003 — Structural implementations
 
-```python
-class Foo(Interface):
-    ...
-```
+Implementations need no Stipulate inheritance, decorators, registration, or dependency. Protocol composition includes an explicit Protocol base. Ordinary subclasses without that marker are not silently promoted to structural types.
 
-**Rationale:** This is the most natural analogue to Pydantic model definitions and minimizes custom syntax.
+## D004 — Python typing foundation
 
-**Consequence:** Runtime machinery must preserve genuine protocol behavior while presenting `Interface` appropriately to static checkers.
+The typing specification governs supported annotation relations. Execution-kind and evidence policies are explicit Stipulate additions. Never silently present checker-specific behavior as language semantics.
 
----
+## D005 — No required checker plugins
 
-## D003 — Preserve structural typing
+Public usage requires no mypy/Pyright plugin or consumer ignores. Supported checker versions and feature flags are documented. First-party code remains Pyright strict permanently.
 
-**Decision:** Implementations are not required to inherit from Stipulate interfaces.
+## D006 — TypeForm constructor; supersedes free-function authority
 
-**Rationale:** The value of Python protocols is structural substitutability. Requiring nominal inheritance would weaken the product considerably.
+Use Contract's TypeForm[T] constructor relationship to infer the validated T. A type[T] free function is not a checker-neutral fallback for Protocol values. No public helper-function API is needed for ordinary validation.
 
----
+TypeForm design probes pass the recorded local checker configurations; installed-distribution and release-version gates remain open. Do not substitute an unrelated object-typed constructor that loses the declaration/T relationship.
 
-## D004 — Compose with `typing.Protocol`
+## D007 — Experimental runtime helpers stay outside protocol members
 
-**Decision:** Stipulate interfaces should remain grounded in Python's protocol model rather than defining an unrelated interface system.
+Any future Interface class-side helpers delegate to Contract and never become required instance members. Do not claim typed shorthand until both checkers, exact member discovery, inheritance, and packaging pass.
 
-**Rationale:** Existing type checkers, IDEs, and annotations already understand protocols.
+## D008 — Original object and bounded guarantee
 
----
+Successful validation returns the candidate itself. It assumes the implementation honors its annotations and exposed signatures. It neither checks future values nor prevents mutation. Even complete evidence is a conclusion about declarations.
 
-## D005 — No required mypy/Pyright plugin
+## D009 — Directional relations
 
-**Decision:** Basic interface use must work with normal static typing tools without custom plugins.
+Use call-shape containment, contravariant inputs, covariant outputs, and separate read/write capabilities. Preserve unknown evidence. Unsupported forms never pass through annotation equality.
 
-**Rationale:** Checker compatibility is a core selling point, not an optional integration.
+## D010 — Strict by default; supersedes permissive default
 
-**Consequence:** Some runtime class-side sugar may be less precisely typed than the free validation API.
+validate() requires conclusive compatible evidence by default. strict=False tolerates only annotation_missing and gradual_type candidate uncertainty after all required structural checks pass. Other unknowns and all known mismatches fail.
 
----
+check() is policy-independent. Unknown is false in boolean context. accepted(strict=...) makes policy acceptance explicit without changing status.
 
-## D006 — `validate()` is the statically authoritative API
+## D011 — Immutable snapshots with weak global ownership
 
-**Decision:**
+Contract owns immutable ContractIR. Global caches use weak declaration keys and weak IR values, because IR may retain its declaration. Strictness is not a compilation key. Custom namespaces bypass shared caching. refresh=True creates a new snapshot while prior contracts remain unchanged.
 
-```python
-validate(Foo, candidate)
-```
+## D012 — Evidence and both exception paths from 0.1
 
-is the canonical API for static type inference.
+Expose CompatibilityResult, Evidence, ContractError, and ContractDefinitionError. Structured findings distinguish incompatible and unknown evidence. check() avoids ContractError for candidate outcomes but does not swallow definition errors or internal defects.
 
-**Rationale:** Current Python typing cannot fully express the custom metaclass API while also representing `Interface` as the special structural protocol base through the desired one-base syntax.
+## D013 — Unsupported is explicit
 
-**Consequence:**
+Unsupported requirements fail construction. Unsupported candidate metadata produces non-permissible unknown evidence. Support means a feature's semantics pass positive, negative, unknown/error, checker, and version tests; returning unsupported is not support.
 
-```python
-Foo.model_validate(candidate)
-```
+## D014 — Declarations and runtime values are separate
 
-may exist as runtime convenience, but documentation should not claim checker support that does not exist.
+Core 0.1 checks supported declared capabilities and storage presence. It does not execute property getters or recursively validate current values. Matching current data cannot prove writable declaration compatibility.
 
----
+## D015 — Introspection execution policy
 
-## D007 — Runtime API belongs on the metaclass
+Do not call candidate methods/getters/dynamic hooks for core checking. Default trusted annotation evaluation can execute annotation expressions; raw mode does not request such evaluation and may leave requirements unresolved. Neither mode is a sandbox. This supersedes the absolute promise of no arbitrary code during annotation resolution.
 
-**Decision:** Pydantic-like class APIs such as `model_validate()` and `interface_schema()` should be implemented on Stipulate's metaclass/runtime class machinery, not as protocol members.
+## D016 — Existing Protocols are the primary adoption path
 
-**Rationale:** Protocol members would become requirements for every structural implementation.
+Contract replaces the earlier InterfaceAdapter and ContractAdapter concepts. Keep Protocol names available as types and give contract instances distinct variable names.
 
----
+## D017 — Specification-oriented conformance
 
-## D008 — Validation returns the original object
+Record specification expectations, checker versions, runtime policy differences, and Stipulate results for each supported case. Tests must include exact inferred types and intended negative diagnostics.
 
-**Decision:** Successful validation returns the candidate itself.
+## D018 — Universal evolution is stronger than gradual acceptance
 
-**Rationale:** Stipulate verifies contracts; it does not need a proxy for ordinary validation.
+Share IR and relation handlers but make relation context explicit. Unknown/Any materialization cannot certify all old implementations or consumers remain compatible. Report implementer and consumer directions separately; unknown never silently passes CI.
 
-**Consequence:** Validation is point-in-time and does not prevent later monkey-patching.
+## D019 — Public tooling follows semantic gates
 
----
+schema(), fingerprint(), compare(), and CompatibilityReport are not in 0.1. Internal normalized IR is required now; portable schema, identity, and evolution guarantees are stabilized later before public examples encourage persistence.
 
-## D009 — Compatibility, not annotation equality
+## D020 — Python and dependency posture
 
-**Decision:** Type checks must implement assignability semantics.
+Target CPython >=3.11 with an explicit tested minor-version matrix. No implicit PyPy claim. typing_extensions provides TypeForm as needed. Pydantic and CLI dependencies remain optional, with Pydantic integration post-1.0. Native code requires profiling evidence.
 
-**Rationale:** Callable parameters are contravariant and returns are covariant. Annotation equality would reject valid implementations and accept some invalid call shapes.
+## D021 — Evidence precedes promotion
 
----
+This checkout's historical prototype claims do not satisfy release gates. Keep versioned design probes, then reproduce them with the actual installed implementation. Do not mark an OTP resolved on documentation edits alone.
 
-## D010 — Explicit strict and permissive modes
+## D022 — Experience is a release criterion
 
-**Decision:** Missing implementation annotations may be allowed in default/permissive mode but must be rejected when strict validation requires proof.
+Teach one Contract and two primary operations: validate() for enforcement and check() for investigation. Plain str/repr output, actionable repair guidance, and accurate uncertainty language are part of 0.1. A pure presenter consumes evidence; it never reclassifies compatibility for display. User-observed task completion gates public beta. See EXPERIENCE_DESIGN.md and OTP-029.
 
-**Rationale:** Python uses gradual typing, but runtime consumers sometimes need stronger guarantees.
+## D023 — Deliver complete user tasks early
 
----
-
-## D011 — Compile once, validate many
-
-**Decision:** Interfaces compile into cached immutable metadata.
-
-**Rationale:** Annotation resolution and signature normalization are too expensive and complex to repeat for every candidate.
-
----
-
-## D012 — Structured errors are public API
-
-**Decision:** Validation errors expose stable structured records, not only human-readable strings.
-
-**Rationale:** Frameworks, IDEs, CI systems, and tests need machine-readable diagnostics.
-
----
-
-## D013 — Fail clearly on unsupported typing constructs
-
-**Decision:** Stipulate must not pretend to validate advanced typing forms it does not understand.
-
-**Rationale:** False confidence is worse than a clear limitation.
-
-**Consequence:** Strict validation should emit `unsupported_type` or a definition error rather than silently reducing unknown forms to equality or `Any`.
-
----
-
-## D014 — Static contract and current runtime value are distinct concepts
-
-**Decision:** Internally separate declaration compatibility from current instance-value validation.
-
-**Rationale:** A current value can match an annotation while the declared writable contract is incompatible, and many typing forms do not map directly to `isinstance` checks.
-
----
-
-## D015 — Do not execute arbitrary methods to validate behavior
-
-**Decision:** Core validation uses introspection and metadata, not behavioral method execution.
-
-**Rationale:** Executing unknown code would introduce side effects, security concerns, nondeterminism, and argument-generation problems.
-
----
-
-## D016 — Existing Protocols are first-class inputs
-
-**Decision:** `InterfaceAdapter` supports ordinary existing `Protocol` classes.
-
-**Rationale:** Mature codebases should be able to adopt runtime validation without rewriting every protocol.
-
----
-
-## D017 — Typing specification is the semantic source of truth
-
-**Decision:** Python's typing specification is the primary reference for assignability semantics.
-
-**Rationale:** Mypy and Pyright are important compatibility targets but can disagree or implement extensions. Stipulate should not blindly encode checker-specific behavior as language semantics.
+Implement the smallest working declaration-to-result path before expanding the type/member matrix. Every delivery slice includes its public typing, meaningful error/unknown behavior, and executable example. Module completion alone is not a product milestone. The roadmap's supported subset remains unchanged.

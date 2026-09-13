@@ -1,1052 +1,729 @@
 # Open Technical Problems
 
-This document is the authoritative backlog of unresolved technical questions in Stipulate.
+This register is authoritative for unfinished acceptance work. ROADMAP.md owns release scope, DESIGN_DECISIONS.md owns policy, and focused specifications own behavior. Cross-references below describe coupled work, not a topological build order; IMPLEMENTATION_PLAN.md orders delivery.
 
-The purpose is not to list vague future features. Each item defines a concrete engineering problem, the semantics Stipulate must preserve, the acceptance criteria required before support is advertised, and the release stage that depends on it.
+The original register is preserved in [the historical archive](history/OPEN_TECHNICAL_PROBLEMS_ORIGINAL.md). Earlier prototype labels are not release evidence. No OTP is marked resolved merely because this reconciliation selected a policy.
 
-Statuses:
+Statuses distinguish open implementation work, deferred scope, and isolated design-probe evidence. “Resolved” requires checked-in acceptance tests passing against the actual implementation and its supported version matrix.
 
-- **Open** — semantics or implementation remain unresolved.
-- **Prototype** — a proof of concept exists but production behavior is not yet proven.
-- **Blocked** — depends on another unresolved problem or a limitation in Python typing/runtime behavior.
-- **Deferred** — intentionally outside the current release target.
-- **Resolved** — decision and acceptance tests are complete; move the durable decision to `DESIGN_DECISIONS.md`.
+## OTP-001 — Interface bridge portability
 
-## OTP-001 — `Interface` bridge portability
+**Status:** Open; historical prototype report not reproduced
 
-**Status:** Prototype  
+**Release target:** Experimental; not a 0.1 blocker
+
+### Problem
+
+The desired class Foo(Interface) bridge must preserve real Protocol behavior while remaining isolated from private typing internals.
+
+### Selected policy
+
+Use standard Protocol plus Contract for 0.1. Bridge experiments must not become a prerequisite for the supported API.
+
+### Acceptance tests
+
+- Run the same runtime member-discovery and construction fixtures across the advertised CPython matrix.
+- Check single/multiple inheritance and explicit Protocol-marker extension in both supported checkers.
+- Confirm implementations require no Stipulate inheritance and framework helpers never enter the required member set.
+- Test installed wheel/sdist behavior and isolate any private typing coupling.
+
+### Related work
+
+OTP-002, OTP-010, OTP-025
+
+## OTP-002 — Typed Interface class-side methods
+
+**Status:** Open; promotion gated
+
+**Release target:** Experimental; not a 0.1 blocker
+
+### Problem
+
+A Protocol re-export does not by itself make Foo.validate() visible to checkers; a normal helper base can pollute structural members.
+
+### Selected policy
+
+The intended shorthand remains a target. Do not ship user-facing ignores, Any returns, checker plugins, or generated per-interface stubs as its solution. Contract(TypeForm[T]) is the supported path, not a type[T] free-function fallback.
+
+### Acceptance tests
+
+- Both checkers infer exact Foo return types for Foo.validate() while accepting unrelated valid implementations.
+- Invalid structural implementations and invalid validation uses are rejected.
+- Class-side helpers remain absent from the runtime protocol member set.
+- Composition, packaging, and runtime behavior satisfy OTP-001.
+
+### Related work
+
+OTP-001, OTP-026
+
+## OTP-003 — Callable call-shape containment
+
+**Status:** Open; historical prototype report not reproduced
+
 **Release target:** 0.1 blocker
 
 ### Problem
 
-Stipulate wants this declaration syntax:
+Candidate methods must accept every legal interface call, not just sampled calls or textually matching signatures.
 
-```python
-class Repository(Interface):
-    ...
-```
+### Selected policy
 
-while preserving genuine Python structural protocol behavior for static checkers and runtime introspection.
-
-The prototype uses a split representation: static checkers see `Interface` as the special `Protocol` base while runtime machinery uses `__mro_entries__` and a custom protocol-compatible metaclass.
-
-### Required semantics
-
-- `class Foo(Interface):` must produce a real runtime protocol.
-- Framework methods must not become protocol members.
-- Structural implementations must not inherit from `Foo`.
-- Mypy and Pyright must recognize ordinary structural implementations.
-- Interface inheritance and multiple interface inheritance must work.
-- No checker plugin may be required for the core experience.
-
-### Open questions
-
-- Does the bridge behave consistently across all supported CPython versions?
-- Does it work on PyPy or other Python implementations we may want to support?
-- Which parts rely on private `typing` implementation details?
-- Can the implementation be isolated so Python-version changes affect only one compatibility module?
+Use deterministic normalized shape containment with binding handled exactly once.
 
 ### Acceptance tests
 
-- CI runs the same bridge fixtures on every supported Python version.
-- Mypy and Pyright accept valid structural implementations and reject representative invalid ones.
-- Runtime tests assert `_is_protocol` behavior and exact protocol-member collection.
-- Multiple inheritance, inherited interfaces, and empty interfaces are covered.
-- No Stipulate runtime class API appears in the candidate implementation contract.
+- Cover positional-only, positional-or-keyword, keyword-only, keyword names, defaults, variadics, and additional required parameters.
+- Include collisions between keyword names and positional/variadic binding.
+- Property tests use valid signatures and bounded call oracles.
+- Unavailable signatures produce non-permissible unknown evidence.
 
-### Dependencies
+### Related work
 
-None. This is foundational.
+OTP-004, OTP-015
 
----
+## OTP-004 — Finite runtime type relations
 
-## OTP-002 — Statically typed class-side API
+**Status:** Open; historical prototype report not reproduced
 
-**Status:** Blocked by current Python typing expressiveness  
-**Release target:** Non-blocking for 0.1; revisit continuously
+**Release target:** 0.1 blocker for the roadmap subset
 
 ### Problem
 
-Runtime syntax such as:
+Runtime metadata must support directional type relations without equality fallback or loss of gradual uncertainty.
 
-```python
-Repository.model_validate(candidate)
-```
+### Selected policy
 
-can be provided by the Stipulate metaclass without contaminating the protocol member set. However, current static typing cannot cleanly express both:
-
-1. `Interface` as the special protocol-defining base through `class Foo(Interface)`, and
-2. custom class-side metaclass methods on every resulting interface.
-
-### Required semantics
-
-The statically authoritative API remains:
-
-```python
-repo = validate(Repository, candidate)
-```
-
-and must infer `Repository` correctly.
-
-Runtime sugar may exist:
-
-```python
-repo = Repository.model_validate(candidate)
-```
-
-but documentation must not claim checker support that does not exist.
-
-### Open questions
-
-- Do future Python typing features provide a clean metaclass/intersection mechanism?
-- Can stubs improve the class-side experience without breaking structural typing?
-- Is there value in optional checker plugins later, without making them required?
+TYPE_SYSTEM.md and ROADMAP.md define the initial finite forms and origin table. Type relations are metadata conclusions, assuming declarations are honored.
 
 ### Acceptance tests
 
-- `validate(Foo, candidate)` has correct inferred return type in mypy and Pyright.
-- Runtime `Foo.model_validate(candidate)` never becomes a required structural member.
-- Documentation clearly distinguishes canonical typed API from runtime convenience API.
+- Test parameter contravariance, return covariance, read/write relations, unions, literals, numeric promotions, and supported collection substitutions.
+- Distinct Literal value types and unsupported identical forms do not pass incorrect fast paths.
+- Missing and Any-dependent evidence follow OTP-028; unsupported origins remain unknown or definition errors.
+- Record specification sections and intentional checker disagreements.
 
-### Dependencies
+### Related work
 
-OTP-001.
+OTP-010, OTP-028
 
----
+## OTP-005 — Annotation resolution and evaluation policy
 
-## OTP-003 — Callable call-shape compatibility
+**Status:** Open; policy selected
 
-**Status:** Prototype  
-**Release target:** 0.1 blocker
+**Release target:** 0.1 blocker for common cases
 
 ### Problem
 
-An implementation must accept every call shape permitted by the interface. Annotation compatibility alone is insufficient.
+String, deferred, imported, local, and recursive annotations cannot always be resolved from available namespaces. Evaluation can execute Python code.
 
-The validator must correctly compare:
+### Selected policy
 
-- positional-only parameters;
-- positional-or-keyword parameters;
-- keyword-only parameters;
-- parameter names where keyword calls are allowed;
-- defaults;
-- extra required parameters;
-- `*args`;
-- `**kwargs`;
-- bound method normalization.
-
-### Required semantics
-
-Compatibility must be deterministic and based on callable assignability, not heuristic generation of a few sample calls.
-
-### Open questions
-
-- What normalized internal representation makes all legal call shapes explicit without combinatorial explosion?
-- How should builtins or extension functions with incomplete signatures be handled?
-- What should permissive mode do when `inspect.signature()` cannot provide enough information?
+Trusted evaluation is the default and may execute annotation expressions. Raw mode does not request evaluation. Unresolved requirements fail definition compilation; candidate-only failures remain non-permissible unknown evidence. Neither mode is a sandbox.
 
 ### Acceptance tests
 
-- Exhaustive positive/negative fixtures for every parameter-kind interaction.
-- Property/fuzz tests generate random signatures and verify invariants.
-- Extra optional implementation parameters are allowed where safe.
-- Extra required implementation parameters are rejected.
-- Keyword-only and positional-only edge cases match Python typing semantics.
+- Cover eager/future/deferred annotations across supported versions and use harmless side-effect counters.
+- Test raw mode without evaluating annotation factories or deferred functions.
+- Test cross-module refs, TYPE_CHECKING-only imports, explicit local namespaces, and unresolved names.
+- Custom namespaces bypass global caching; no arbitrary import is attempted for resolution.
+- Recursive unsupported forms terminate with clear diagnostics.
 
-### Dependencies
+### Related work
 
-OTP-004 for type compatibility of parameters and returns.
+OTP-013, OTP-021, OTP-025
 
----
+## OTP-006 — Generic interface specialization
 
-## OTP-004 — Runtime type assignability engine
+**Status:** Open
 
-**Status:** Prototype  
-**Release target:** 0.1 blocker for core supported forms
+**Release target:** Phase 3; not general 0.1 support
 
 ### Problem
 
-Stipulate must validate type compatibility rather than annotation equality.
+User TypeVars must be bound coherently across members and substituted through nested and inherited types.
 
-For callables:
+### Selected policy
 
-- implementation parameter annotations are checked contravariantly;
-- implementation return annotations are checked covariantly.
-
-The assignability engine must eventually handle Python typing constructs consistently with the typing specification.
-
-### Required semantics for 0.1
-
-Correct support for:
-
-- identity;
-- `Any`;
-- missing annotations under permissive/strict policy;
-- `None`;
-- ordinary class/subclass relationships;
-- PEP 604 and `typing.Union` unions;
-- `Literal`;
-- `Annotated` underlying type while retaining metadata;
-- explicitly supported generic containers with known variance.
-
-Unsupported forms must never silently fall back to annotation equality.
-
-### Open questions
-
-- What normalized representation should the engine use?
-- How should `Any` behave differently in permissive and strict modes?
-- Which generic origins can be supported safely in the initial release?
-- How do we avoid encoding checker-specific extensions as Python semantics?
+Builtin collection-origin rules do not imply support for arbitrary generic interfaces. Do not erase unsupported type arguments.
 
 ### Acceptance tests
 
-- A specification-oriented assignability corpus.
-- Directionality tests proving contravariant parameters and covariant returns.
-- Explicit unsupported diagnostics for unknown constructs.
-- Intentional mypy/Pyright disagreements are recorded rather than hidden.
+- Cover repeated TypeVars, bounds/constraints, multiple variables, inherited bindings, and inconsistent substitutions.
+- Specify specialized versus unspecialized behavior before advertisement.
+- Prevent recursive substitution from looping or binding the same variable inconsistently.
 
-### Dependencies
+### Related work
 
-OTP-010 for checker parity policy.
+OTP-004, OTP-007
 
----
+## OTP-007 — General generic variance
 
-## OTP-005 — Annotation resolution and forward references
+**Status:** Open
 
-**Status:** Open  
-**Release target:** 0.1 blocker for common cases; expanded in 0.x
+**Release target:** Phase 3
 
 ### Problem
 
-Runtime annotations may be strings or otherwise require contextual resolution because of:
+User generics can be invariant, covariant, contravariant, or use inferred variance; runtime metadata may be incomplete.
 
-- `from __future__ import annotations`;
-- explicit forward references;
-- nested classes;
-- imported aliases;
-- recursive definitions;
-- local scopes.
+### Selected policy
 
-`inspect.signature()` alone does not provide resolved semantic types.
-
-### Required semantics
-
-- Compilation uses a controlled annotation-resolution layer.
-- The original source annotation is retained for diagnostics.
-- Resolution failures become Stipulate definition diagnostics, not unrelated raw exceptions.
-- Stipulate does not execute arbitrary user code merely to resolve types.
-
-### Open questions
-
-- Which `globalns` and `localns` sources are safe and reliable?
-- How should function-local interface definitions be handled?
-- When should unresolved references be a definition error versus an unsupported-type diagnostic?
-- How should recursive aliases be represented without infinite recursion?
+The 0.1 supported collection table is finite. General variance remains a separate gate.
 
 ### Acceptance tests
 
-- Future annotations.
-- Same-module and cross-module forward references.
-- Nested interfaces and nested implementation types.
-- Unresolvable names produce stable diagnostics.
-- Recursive structures do not recurse indefinitely.
+- Test explicit and inferred variance against specification fixtures.
+- Cover inherited generic origin substitutions, producer/consumer examples, and mutable invariance.
+- Unknown variance is unsupported rather than guessed.
 
-### Dependencies
+### Related work
 
-OTP-004 and OTP-013.
+OTP-004, OTP-006
 
----
+## OTP-008 — Overload-set relations
 
-## OTP-006 — Generic interface specialization and `TypeVar` binding
+**Status:** Open
 
-**Status:** Open  
-**Release target:** Phase 3 / pre-1.0
+**Release target:** Phase 4; required only if advertised
 
 ### Problem
 
-Generic interfaces require more than recognizing a parameterized alias. Stipulate must determine concrete bindings and enforce them consistently across every member.
+Every required overload must be supported with its input/output correlations despite incomplete runtime overload metadata.
 
-Example:
+### Selected policy
 
-```python
-T = TypeVar("T")
-
-class Repository(Interface, Generic[T]):
-    def get(self, key: str) -> T: ...
-    def save(self, value: T) -> None: ...
-```
-
-For `Repository[User]`, every use of `T` must specialize to `User`.
-
-### Open questions
-
-- How are bindings recovered from `Repository[User]` at runtime?
-- How is `T` handled when an unspecialized `Repository` is validated?
-- What if separate members imply incompatible bindings for the same variable?
-- How do bounded and constrained `TypeVar`s behave?
-- How are inherited generic interfaces specialized?
-- How are multiple type variables substituted recursively through nested annotations?
-
-### Required semantics
-
-- Specialization happens before candidate validation.
-- No silent erasure of type arguments.
-- A single coherent binding environment is used throughout a compiled interface.
+Do not reduce an overload set to unrelated unions or trust a broad runtime signature to establish each correlated return.
 
 ### Acceptance tests
 
-- Single and multiple `TypeVar`s.
-- Bound and constrained variables.
-- Repeated `T` across parameters/returns/members.
-- Conflicting inferred bindings.
-- Generic inheritance.
-- Specialized and intentionally unsupported unspecialized forms.
+- Test disjoint/overlapping overloads, broad implementations, missing coverage, and return correlations.
+- Specify metadata precedence and behavior for .pyi-only overloads.
+- Missing metadata yields explicit uncertainty or definition diagnostics.
 
-### Dependencies
+### Related work
 
-OTP-004 and OTP-007.
+OTP-003, OTP-004, OTP-015
 
----
+## OTP-009 — Advanced callable packs
 
-## OTP-007 — Generic variance
+**Status:** Deferred
 
-**Status:** Open  
-**Release target:** Phase 3 / pre-1.0
-
-### Problem
-
-Parameterized generic types are not uniformly covariant. Mutable abstractions are commonly invariant, consumers can be contravariant, and Python 3.12+ can infer variance for type parameters.
-
-### Open questions
-
-- How will explicit covariance/contravariance be read at runtime?
-- How will Python 3.12+ inferred variance be represented?
-- Which builtin and standard-library generic origins have known variance?
-- How should user-defined generic classes be handled if variance metadata is incomplete?
-
-### Required semantics
-
-Stipulate must never assume covariance merely because two generic origins match.
-
-### Acceptance tests
-
-- Covariant producer examples.
-- Contravariant consumer examples.
-- Invariant mutable-container examples.
-- Explicit versus inferred variance fixtures.
-- Conservative unsupported behavior when variance cannot be established.
-
-### Dependencies
-
-OTP-006 and OTP-004.
-
----
-
-## OTP-008 — Overload-set validation
-
-**Status:** Open  
-**Release target:** Phase 4 / pre-1.0 if advertised
-
-### Problem
-
-An interface may define multiple `@overload` signatures while the candidate exposes one runtime implementation signature.
-
-Example:
-
-```python
-class Parser(Interface):
-    @overload
-    def parse(self, value: bytes) -> BinaryResult: ...
-
-    @overload
-    def parse(self, value: str) -> TextResult: ...
-```
-
-### Open questions
-
-- Must the implementation be assignable to every overload individually?
-- How are overlapping overloads treated?
-- What runtime overload metadata is reliably available?
-- How do `.pyi`-only overload definitions affect runtime validation?
-- What happens when an implementation is broader than the overload set but still safely supports all calls?
-
-### Required semantics
-
-No overload support is advertised until Stipulate can prove that every interface-supported call is safe against the candidate.
-
-### Acceptance tests
-
-- Disjoint overloads.
-- Overlapping overloads.
-- Broad implementation satisfying multiple overloads.
-- Missing overload coverage.
-- Overloads with different return types.
-- Missing runtime metadata produces a clear unsupported/definition diagnostic.
-
-### Dependencies
-
-OTP-003 and OTP-004.
-
----
-
-## OTP-009 — Advanced callable typing
-
-**Status:** Deferred  
 **Release target:** Phase 4
 
 ### Problem
 
-`ParamSpec`, `Concatenate`, complex `Callable` forms, `TypeVarTuple`, and `Unpack` model parameter packs that cannot be reduced to ordinary fixed signatures without losing semantics.
+ParamSpec, Concatenate, TypeVarTuple, and Unpack require explicit parameter-pack representations.
 
-### Open questions
+### Selected policy
 
-- How should `ParamSpec` bindings be represented in compiled metadata?
-- How does `Concatenate` compose with actual inspected call signatures?
-- How are variadic type parameters substituted?
-- Which of these forms have sufficient runtime metadata to validate reliably?
+Do not flatten packs into arbitrary args/kwargs or infer support from successful imports.
 
 ### Acceptance tests
 
-Each construct requires its own typing-spec fixture suite before support is claimed.
+- Each construct gets specification-based substitution, binding, and negative fixtures.
+- Unsupported packs fail explicitly in requirements and remain non-permissible unknowns in candidates.
 
-### Dependencies
+### Related work
 
-OTP-003, OTP-004, OTP-006.
+OTP-003, OTP-004, OTP-006
 
----
+## OTP-010 — Checker conformance and disagreements
 
-## OTP-010 — Checker parity and disagreement policy
+**Status:** Open
 
-**Status:** Open  
-**Release target:** 0.1 blocker for core syntax
+**Release target:** 0.1 blocker for public API and supported forms
 
 ### Problem
 
-Stipulate should align with Python's typing specification, while mypy and Pyright may disagree with each other or implement checker-specific extensions.
+Checker acceptance, runtime evidence, and language semantics differ; all must be recorded accurately.
 
-### Required policy
+### Selected policy
 
-Precedence:
-
-1. Python typing specification where semantics are defined.
-2. Intentional Stipulate runtime policy where runtime information differs from static information.
-3. Checker-specific compatibility accommodations only when they do not contradict the language model.
-
-A checker disagreement must be explicit, tested, and documented.
-
-### Open questions
-
-- Where do mypy and Pyright materially differ for protocol/callable cases Stipulate supports?
-- When is compatibility with both more valuable than strict interpretation of an underspecified rule?
-- How are version-specific checker behavior changes tracked?
+Use the typing specification first, explicit runtime policy second, and checker accommodations only without silent semantic changes. Pyright strict is permanent.
 
 ### Acceptance tests
 
-Maintain `typing_tests/` fixtures with expected mypy, Pyright, and Stipulate outcomes for supported cases.
+- Pin supported checker versions and feature flags.
+- Run valid and intentionally invalid installed-distribution fixtures with exact inferred types and expected diagnostic codes.
+- Record the type[T] Protocol-value disagreement and required explicit Protocol composition.
+- Expand the relation corpus alongside OTP-004 rather than making their mutual references an impossible scheduling cycle.
 
-### Dependencies
+### Related work
 
-OTP-001 and OTP-004.
+OTP-026; OTP-004 for the expanding relation corpus
 
----
+## OTP-011 — Instance storage versus class preflight
 
-## OTP-011 — Class validation versus instance validation
+**Status:** Open; policy selected
 
-**Status:** Open  
-**Release target:** 0.x; instance semantics required for 0.1
+**Release target:** 0.1 instance semantics; class preflight deferred
 
 ### Problem
 
-Instance validation can observe members created by `__init__`; class validation cannot reliably infer every runtime instance attribute.
+Class annotations do not establish storage created by __init__; classes used as objects have different binding semantics from instances.
 
-The package must distinguish:
+### Selected policy
 
-```python
-validate(InterfaceType, instance)
-```
-
-from any future API like:
-
-```python
-validate_class(InterfaceType, ImplementationClass)
-```
-
-### Open questions
-
-- Which members may safely be validated from a class without instantiation?
-- How should annotations-only attributes be treated?
-- How do `__slots__`, dataclasses, attrs classes, ORM instrumentation, and generated fields participate?
-- Should class validation be intentionally weaker and return an incomplete/preflight result?
-
-### Required semantics
-
-0.1 instance validation must not claim that class-level introspection proves instance state that is only established during construction.
+Target instance validation in 0.1. Do not infer constructed instance conformance from an implementation class. Reject unsupported class-object candidates explicitly; a future class-preflight API has separate guarantees.
 
 ### Acceptance tests
 
-- `__init__`-created attributes.
-- class attributes.
-- slots.
-- dataclasses.
-- annotation-only members.
-- explicit documentation of differences between class and instance validation.
+- Test present/missing initialized storage, class attributes, annotations-only members, and slots.
+- Only claim presence that supported static inspection establishes.
+- Reject unsupported class-object validation without instantiation or misleading success.
 
-### Dependencies
+### Related work
 
-OTP-012.
+OTP-012, OTP-014
 
----
+## OTP-012 — Attributes, properties, and descriptor capabilities
 
-## OTP-012 — Attributes, properties, and descriptor semantics
+**Status:** Open; policy selected
 
-**Status:** Open / partially prototyped  
-**Release target:** 0.1 for attributes/properties; expanded in Phase 2
+**Release target:** 0.1 documented plain storage/properties; Phase 2 expansion
 
 ### Problem
 
-Python exposes several different member forms with different read/write semantics:
+Read/write declarations and current values are different obligations. Descriptors can hide or execute behavior.
 
-- plain instance attributes;
-- class attributes;
-- read-only properties;
-- writable properties;
-- custom descriptors;
-- `cached_property`;
-- dynamic attributes.
+### Selected policy
 
-A current runtime value matching a type does not prove the declaration is safely writable.
-
-### Required semantics
-
-Stipulate must internally distinguish at least:
-
-- readable member;
-- writable member;
-- read-only property;
-- writable property.
-
-Declaration compatibility and current-value validation remain separate concepts.
-
-### Open questions
-
-- How are custom descriptor setter/getter annotations recovered?
-- How should data descriptors and non-data descriptors differ?
-- Does permissive mode accept a dynamically supplied member when declaration compatibility cannot be proven?
+Core 0.1 uses declared read/write types plus supported presence checks. Standard properties are inspected without calling them. Custom/generated descriptors and cached_property remain explicit limitations.
 
 ### Acceptance tests
 
-- plain attributes;
-- class attributes;
-- read-only/writable properties;
-- custom descriptor fixtures;
-- `cached_property`;
-- mismatch between current value and declared writable contract.
+- Test read covariance, write contravariance, writable invariance, and rejection of read-only properties for writable contracts.
+- Test a matching current value with an incompatible declared writable type.
+- Getter/setter/dynamic hook counters remain untouched.
+- Unsupported storage and custom dispatch yield explicit uncertainty.
 
-### Dependencies
+### Related work
 
-OTP-011 and OTP-014.
+OTP-004, OTP-011, OTP-014
 
----
+## OTP-013 — Definition and candidate failures
 
-## OTP-013 — Definition errors versus candidate validation errors
+**Status:** Open; policy selected
 
-**Status:** Open  
 **Release target:** 0.1 blocker
 
 ### Problem
 
-Two fundamentally different failures must not be conflated:
+An invalid requirement must not be reported as a candidate mismatch or silently tolerated by permissive validation.
 
-1. the interface itself cannot be compiled or interpreted correctly;
-2. the candidate does not satisfy a valid interface.
+### Selected policy
 
-Examples of definition failures include unresolved annotations, unsupported declarations in strict mode, malformed metadata, or impossible interface constructs.
-
-### Required semantics
-
-Stipulate should provide a distinct definition/compilation error path from `InterfaceValidationError` or otherwise make the distinction unambiguous in structured diagnostics.
-
-### Open questions
-
-- Separate exception class versus shared base class with phase metadata?
-- Are unsupported constructs definition errors or validation errors when only encountered for a particular specialization?
-- Which failures should be cached with the compiled interface?
+ContractDefinitionError and ContractError exist from 0.1. Eager construction validates requirements independently of strictness.
 
 ### Acceptance tests
 
-- unresolved forward reference;
-- unsupported type construct;
-- malformed interface declaration;
-- normal candidate mismatch;
-- callers can distinguish definition failure without parsing strings.
+- Test unresolved/unsupported requirements, malformed declarations, and conflicting inherited members.
+- Test ordinary candidate incompatibility, missing evidence, and strict unknown rejection.
+- check() never raises ContractError for an expected candidate outcome but preserves definition/internal failures.
+- Do not cache exception objects or tracebacks.
 
-### Dependencies
+### Related work
 
-OTP-005 and OTP-015.
+OTP-005, OTP-022, OTP-028
 
----
+## OTP-014 — Dynamic members and inspection uncertainty
 
-## OTP-014 — Dynamic members and introspection uncertainty
+**Status:** Open; policy selected
 
-**Status:** Open / partially prototyped  
-**Release target:** 0.x; explicit 0.1 policy required
+**Release target:** 0.1 explicit limitation; expanded in Phase 2
 
 ### Problem
 
-Objects using `__getattr__`, `__getattribute__`, proxies, ORM instrumentation, extension types, or runtime monkey-patching may expose members that static inspection cannot prove.
+__getattr__, custom __getattribute__, proxies, custom binding, and extension objects may not expose trustworthy static capabilities.
 
-### Required semantics
+### Selected policy
 
-Stipulate must distinguish:
-
-- member proven by declaration/introspection;
-- member present on the current instance;
-- member dynamically claimed but not statically inspectable.
-
-Strict mode should require stronger proof than permissive mode.
-
-### Open questions
-
-- Is successful `getattr` sufficient evidence for readable attributes in permissive mode?
-- How should callable dynamic members be validated when no inspectable signature exists?
-- Should diagnostics include a confidence/proof category?
+Do not invoke dynamic hooks to seek compatible evidence in either strict or permissive core validation. Preserve explicit non-permissible unknowns.
 
 ### Acceptance tests
 
-- `__getattr__` dynamic attribute.
-- dynamic callable.
-- proxy object.
-- extension/builtin callable with unavailable signature.
-- strict and permissive outcomes are explicit.
+- Test dynamic attributes/callables, proxies, unavailable builtin signatures, and overridden dispatch.
+- Distinguish ordinary missing members from uninspectable dynamic members.
+- Verify no access hook is called merely to improve evidence.
 
-### Dependencies
+### Related work
 
-OTP-003 and OTP-012.
+OTP-003, OTP-012, OTP-028
 
----
+## OTP-015 — Decorator signature recovery
 
-## OTP-015 — Decorators and signature recovery
+**Status:** Open; policy selected
 
-**Status:** Open  
-**Release target:** 0.1 hardening
+**Release target:** 0.1 blocker
 
 ### Problem
 
-Decorators can preserve, replace, or obscure a callable signature. Runtime sources include:
+__signature__, __wrapped__, and the visible wrapper can provide different declarations.
 
-- `__wrapped__`;
-- `__signature__`;
-- the visible wrapper signature;
-- generated callables with incomplete metadata.
+### Selected policy
 
-### Open questions
-
-- What precedence should Stipulate use among `__signature__`, unwrapped signature, and wrapper signature?
-- When is unwrapping semantically wrong because the wrapper intentionally changes the public contract?
-- How many unwrap levels are safe?
-
-### Required semantics
-
-Stipulate validates the externally callable contract, not blindly the original undecorated implementation.
+Prefer a valid exposed __signature__, then the supported wrapped chain, then the visible signature. Trust exposed metadata without claiming to prove wrapper behavior.
 
 ### Acceptance tests
 
-- `functools.wraps` preserving signature.
-- explicit `__signature__` override.
-- decorator that intentionally adds/removes parameters.
-- stacked decorators.
-- wrapper cycle/malformed metadata protection.
+- Test explicit overrides, wraps, intentional public signature changes, stacked wrappers, cycles, and malformed metadata.
+- Normalize binding once and preserve the selected provenance.
+- Unknown signature recovery never passes via strict=False.
 
-### Dependencies
+### Related work
 
-OTP-003.
+OTP-003, OTP-014
 
----
+## OTP-016 — Execution-kind semantics
 
-## OTP-016 — Async, generators, and awaitable semantics
+**Status:** Open; policy selected
 
-**Status:** Partially prototyped  
-**Release target:** 0.1 for sync/async mismatch; later expansion
+**Release target:** 0.1 def/coroutine policy; later expansion
 
 ### Problem
 
-`async def` syntax is only one asynchronous contract. Python also has:
+Coroutine functions, awaitable-returning def, generators, async generators, and callable objects have different runtime representations.
 
-- sync functions returning `Awaitable[T]`;
-- async generators;
-- sync generators;
-- async context managers;
-- callable objects whose `__call__` is async.
+### Selected policy
 
-### Open questions
-
-- Does the interface require syntactic `async def`, semantic awaitability, or annotation compatibility?
-- How should async generators differ from coroutines?
-- Should callable objects be normalized through `__call__`?
-
-### Required semantics for 0.1
-
-A declared `async def` interface method must not silently accept an ordinary synchronous method merely because its return annotation resembles an awaitable, unless that behavior is explicitly designed and tested.
+0.1 requires matching ordinary def/coroutine async def declaration kinds in addition to signature/type relations. This is a Stipulate policy, potentially stricter than typing assignability.
 
 ### Acceptance tests
 
-- sync vs async mismatch.
-- async callable objects.
-- later: generator and context-manager matrices.
+- Test coroutine versus ordinary def in both directions and prevent double wrapping of coroutine result annotations.
+- Classify generators/async generators/callable objects explicitly as unsupported until handlers pass.
+- Decorator metadata cannot silently erase execution-kind uncertainty.
 
-### Dependencies
+### Related work
 
-OTP-003 and OTP-004.
+OTP-003, OTP-004, OTP-015
 
----
+## OTP-017 — Nested Protocol annotations
 
-## OTP-017 — Nested protocols as annotation types
+**Status:** Open
 
-**Status:** Open  
 **Release target:** Phase 2
 
 ### Problem
 
-An interface member may use another protocol/interface as a parameter or return annotation.
+Protocols in parameter/return annotations require structural type relations, not recursive execution of candidate values.
 
-Example:
+### Selected policy
 
-```python
-class Store(Interface):
-    def save(self, serializer: Serializer) -> None: ...
-```
-
-Stipulate must decide whether assignability of `Serializer` is evaluated purely as a typing annotation relationship or invokes deeper Stipulate structural validation.
-
-### Required semantics
-
-Type assignability and recursive candidate validation must not be accidentally conflated.
-
-### Open questions
-
-- Does nested protocol assignability rely on normal subclass/protocol typing semantics only?
-- Is there an opt-in mode for recursively validating runtime values?
-- How are recursive protocol references prevented from causing validation cycles?
+Do not conflate annotation assignability with runtime-value validation. The initial nominal table does not imply nested Protocol support.
 
 ### Acceptance tests
 
-- nested protocol parameter/return annotations.
-- mutually recursive protocols.
-- normal class satisfying a nested structural protocol.
-- no unbounded recursive validation.
+- Test nested concrete-to-Protocol relations, mutually recursive contracts, and termination.
+- Use cycle-aware relation state rather than unconditional success for a visited pair.
+- No nested candidate return value is obtained by calling a method.
 
-### Dependencies
+### Related work
 
-OTP-004 and OTP-005.
+OTP-004, OTP-005
 
----
+## OTP-018 — Self binding
 
-## OTP-018 — `Self`
+**Status:** Open
 
-**Status:** Open  
+**Release target:** Phase 4; required only if advertised
+
+### Problem
+
+Self depends on enclosing and implementing types, inheritance, and method binding.
+
+### Selected policy
+
+Preserve structural Self relationships rather than choosing the interface or candidate class by convenience.
+
+### Acceptance tests
+
+- Use specification fixtures for parameters, returns, inherited methods, and class methods.
+- Record the binding environment and prove consistent substitution across a contract.
+
+### Related work
+
+OTP-004, OTP-006
+
+## OTP-019 — Typed kwargs and TypedDict unpacking
+
+**Status:** Deferred
+
 **Release target:** Phase 4
 
 ### Problem
 
-`Self` depends on the enclosing interface/class and may appear in return types, parameters, classmethods, and inherited interfaces.
+Unpack[TypedDict] encodes keyword names, requiredness, and value types jointly.
 
-### Open questions
+### Selected policy
 
-- What does `Self` bind to when validating a structural implementation that does not inherit from the interface?
-- Should `Self` represent the candidate concrete class, the interface type, or an assignability relationship between them?
-- How does inheritance change the binding?
+No support until the callable algorithm preserves these relationships.
 
 ### Acceptance tests
 
-Require typing-spec examples plus structural implementation cases before support is advertised.
+- Test required/optional keys, Required/NotRequired, ordinary kwargs, collisions, and missing coverage.
+- Derive fixtures from the typing specification.
 
-### Dependencies
+### Related work
 
-OTP-004 and OTP-006.
+OTP-003, OTP-004, OTP-009
 
----
+## OTP-020 — Mutation and snapshot refresh
 
-## OTP-019 — Typed `**kwargs`, `TypedDict`, and `Unpack`
+**Status:** Open; policy selected
 
-**Status:** Deferred  
-**Release target:** Phase 4
-
-### Problem
-
-Modern Python typing can use `Unpack[TypedDict]` to describe keyword parameter sets precisely. This affects both call shape and type compatibility.
-
-### Open questions
-
-- How are required versus optional keys mapped into callable compatibility?
-- How do `total=False` and `Required`/`NotRequired` affect assignability?
-- How does `**kwargs: Unpack[T]` interact with an ordinary `**kwargs` implementation?
-
-### Acceptance tests
-
-Typing-spec-driven fixture matrix before support is advertised.
-
-### Dependencies
-
-OTP-003, OTP-004, OTP-009.
-
----
-
-## OTP-020 — Mutation and cache invalidation
-
-**Status:** Open  
-**Release target:** 0.1 policy; advanced behavior can be deferred
-
-### Problem
-
-Python classes can be monkey-patched after an interface has been compiled or a candidate has been validated.
-
-Stipulate intends validation to be point-in-time, but caches must not accidentally promise stronger immutability than Python provides.
-
-### Required semantics
-
-- A successful validation does not guarantee future conformance after mutation.
-- Compiled interface metadata is cached because interface definitions are expected to be stable.
-- Cache behavior under deliberate mutation must be documented.
-
-### Open questions
-
-- Do we ever attempt automatic invalidation if an interface class changes?
-- Should there be an explicit `clear_cache(interface=None)` API?
-- Can weak references prevent stale class retention without expensive mutation tracking?
-
-### Acceptance tests
-
-- weak-reference lifecycle.
-- cache clear behavior if exposed.
-- documented result when an interface is monkey-patched after compilation.
-- candidate mutation after validation has no hidden proxy enforcement.
-
-### Dependencies
-
-OTP-021.
-
----
-
-## OTP-021 — Compiled metadata caching and thread safety
-
-**Status:** Prototype  
 **Release target:** 0.1 blocker
 
 ### Problem
 
-Compilation performs expensive introspection, annotation resolution, signature normalization, and member classification. The result should be immutable and reusable across validation calls.
+Classes and annotation dependencies can change after compilation; validated candidates can change after checking.
 
-### Required semantics
+### Selected policy
 
-- compiled metadata contains no candidate-specific state;
-- cache does not keep dead interface classes alive unnecessarily;
-- concurrent validation is safe;
-- failed compilation behavior is deterministic.
-
-### Open questions
-
-- WeakKeyDictionary versus another weak-reference strategy?
-- Should compilation be protected by per-interface locks, a global lock, or idempotent duplicate work?
-- Are failed definition compilations cached?
+Contracts are snapshots. No automatic mutation tracking or candidate-success cache. Contract(Storage, refresh=True) creates a new snapshot; retained old contracts remain unchanged.
 
 ### Acceptance tests
 
-- warm validation reuses the same compiled contract.
-- interface classes can be garbage-collected.
-- concurrent compilation/validation stress test.
-- no mutable shared candidate state.
+- Test interface mutation with and without refresh, failed refresh, and multiple retained snapshots.
+- Test candidate mutation observed on the next check.
+- Document changes to referenced annotation types and namespaces.
 
-### Dependencies
+### Related work
 
-OTP-005 and OTP-013.
+OTP-021
 
----
+## OTP-021 — Cache ownership and concurrency
 
-## OTP-022 — Error-code and diagnostic stability
+**Status:** Open; retention trap reproduced in design probe
 
-**Status:** Open  
-**Release target:** 0.1 initial contract; 1.0 stability guarantee
+**Release target:** 0.1 blocker
 
 ### Problem
 
-Structured errors are part of Stipulate's public value. Frameworks and CI systems may depend on error codes and locations.
+Weak keys do not prevent leaks when cached values retain their declaration keys, directly or through annotations.
 
-### Required semantics
+### Selected policy
 
-Every diagnostic should have stable machine-readable fields such as:
-
-```python
-{
-    "loc": ("save", "value"),
-    "type": "parameter_type",
-    "msg": "Implementation parameter type is too narrow",
-    "expected": ...,
-    "actual": ...,
-}
-```
-
-### Open questions
-
-- Which fields are guaranteed from 0.1 versus 1.0?
-- How are nested causes represented?
-- How are unsupported features distinguished from invalid implementations?
-- Is human-readable wording semver-stable or only machine-readable codes?
+Use weak keys and weak IR values globally; a live Contract strongly owns its snapshot. Custom namespaces bypass shared caching. Locks protect cache operations, not user evaluation.
 
 ### Acceptance tests
 
-- deterministic error ordering.
-- multi-error aggregation.
-- stable locations and codes.
-- definition errors and candidate errors are distinguishable.
+- Test collection of local and self-referential interfaces after all owners disappear.
+- Test IR reuse while retained, expiry otherwise, and no cached traceback retention.
+- Stress concurrent first-use, refresh, and validation without mutable shared candidate state.
+- Do not require exactly-once annotation evaluation under races.
 
-### Dependencies
+### Related work
 
-OTP-013.
+OTP-005, OTP-020
 
----
+## OTP-022 — Diagnostic contract and usability
 
-## OTP-023 — Versioned interface schema
+**Status:** Open; initial policy selected
 
-**Status:** Open  
-**Release target:** Phase 5
+**Release target:** 0.1 initial fields/codes; 1.0 stability
 
 ### Problem
 
-`interface_schema()` should eventually expose machine-readable compiled interface metadata, but a schema format becomes a compatibility surface of its own.
+Users need both an immediately understandable repair and stable machine-readable failure/uncertainty records.
 
-### Open questions
+### Selected policy
 
-- JSON-serializable versus Python-native schema representation?
-- How are arbitrary Python types represented?
-- How are signatures, variance, overloads, generics, and unsupported constructs encoded?
-- How is schema versioning declared?
-- Can schemas be compared for compatibility between interface versions?
-
-### Required semantics
-
-Do not stabilize a schema accidentally through an undocumented dictionary shape.
+ERROR_MODEL.md defines initial exceptions, evidence, export fields, code categories, ordering, and prose stability.
 
 ### Acceptance tests
 
-- explicit schema version.
-- deterministic serialization.
-- round-trip tests if deserialization is supported.
-- schema changes follow a documented compatibility policy.
+- Verify JSON-compatible exports, immutable internal records, independent export copies, and stable locations/codes.
+- Render incompatible and unknown findings differently.
+- Suggest permissive validation only for allowlisted uncertainty.
+- Test ContractError.errors() rejected unknowns versus result.errors() incompatibilities.
 
-### Dependencies
+### Related work
 
-Most compilation/type-system problems; especially OTP-004, OTP-006, OTP-008.
+OTP-013, OTP-028
 
----
+## OTP-023 — Canonical schema and identity
 
-## OTP-024 — Performance boundaries and benchmarking
+**Status:** Open
 
-**Status:** Open  
-**Release target:** Benchmark baseline before beta; hard guarantees by 1.0 if justified
+**Release target:** Phase 5; not public 0.1
 
 ### Problem
 
-Deep runtime interface validation is inherently more expensive than member-presence checks. Stipulate must prevent annotation resolution and normalization costs from dominating repeated validation.
+Portable serialization must represent semantics and nominal identity without leaking arbitrary runtime objects or executing imports during loading.
 
-### Open questions
+### Selected policy
 
-- What is an acceptable cold-compilation cost?
-- What is an acceptable warm-validation overhead for typical interfaces?
-- Which operations dominate runtime cost?
-- Should strict mode have a separate performance target?
-
-### Required semantics
-
-Performance work must not weaken correctness or silently skip validation.
+Internal IR is not public schema. Freeze versioning, portability, normalization, defaults, and ignored metadata before schema()/fingerprint() publication.
 
 ### Acceptance tests
 
-Benchmarks for:
+- Deterministic member/union/type ordering and versioned canonical output.
+- Local/dynamic nominal types are rejected or marked non-portable rather than serialized with unstable repr.
+- Separate default presence from behavior-changing default values and ignored Annotated constraints.
+- Round trips only if deserialization is actually supported; no automatic arbitrary import/evaluation.
+- Fingerprint differences do not imply incompatibility.
 
-- cold compilation;
-- warm validation;
-- interfaces with many members;
-- deep annotation trees;
-- valid and invalid candidates;
-- strict vs permissive modes.
+### Related work
 
-### Dependencies
+OTP-004, OTP-005; additional type-feature gates only for forms actually serialized
 
-OTP-021.
+## OTP-024 — Performance baseline
 
----
+**Status:** Open
 
-## OTP-025 — Supported Python implementations and versions
-
-**Status:** Open  
-**Release target:** 0.1 explicit matrix; 1.0 stable policy
+**Release target:** Before beta; justified guarantees by 1.0
 
 ### Problem
 
-Stipulate interacts closely with `typing`, introspection, signatures, and protocol runtime behavior, all of which evolve between Python versions.
+Requirement caching does not remove repeated candidate introspection costs.
 
-### Open questions
+### Selected policy
 
-- Minimum supported Python version?
-- CPython-only initially, or PyPy too?
-- How quickly are newly released Python versions added?
-- Which compatibility shims may use `typing_extensions`?
-
-### Required semantics
-
-Every advertised Python version must run the runtime test suite and checker fixtures in CI.
+Measure cold compilation and candidate inspection separately. Favor retained Contract reuse; no premature native implementation.
 
 ### Acceptance tests
 
-Support matrix in CI and documentation; no version is advertised solely because the package imports successfully.
+- Benchmark success, mismatch, uncertainty, temporary/retained contracts, large interfaces, and annotation depth.
+- Separate performance tracking from fragile correctness thresholds.
+- Optimizations must preserve evidence and mutation policy.
 
-### Dependencies
+### Related work
 
-OTP-001 and OTP-005.
+OTP-021
 
----
+## OTP-025 — Runtime and packaging matrix
+
+**Status:** Open; minimum and initial targets selected
+
+**Release target:** 0.1 blocker
+
+### Problem
+
+Protocol, annotation, and introspection behavior varies across Python releases.
+
+### Selected policy
+
+Minimum CPython 3.11; initial release test targets 3.11–3.14. No runtime support is advertised before complete tests pass. PyPy is not a 0.1 claim.
+
+### Acceptance tests
+
+- Run compiler, checker fixtures, candidate validation, evidence, caching, and installed-distribution tests across the supported matrix.
+- Test newer deferred annotation behavior rather than relying on import success.
+- Record tested checker/dependency versions and required flags.
+
+### Related work
+
+OTP-005, OTP-010, OTP-026
+
+## OTP-026 — TypeForm public Contract boundary
+
+**Status:** Design probe passes recorded local configurations; package implementation open
+
+**Release target:** 0.1 blocker
+
+### Problem
+
+The constructor must tie a Protocol declaration to validate() return type without the concrete-class restriction of type[T].
+
+### Selected policy
+
+Use TypeForm[T]. Preserve Contract(Storage) inference without caller-selected unrelated type parameters or public Any leakage.
+
+### Acceptance tests
+
+- Both supported checkers infer Contract[Storage] and validate() -> Storage.
+- Reject mismatched explicit generic arguments and invalid type-form inputs statically; reject unsupported declaration forms at runtime.
+- Record mypy TypeForm flags and typing_extensions requirements.
+- Reproduce design probes against installed wheel and sdist with no source-tree shadowing.
+
+### Related work
+
+OTP-010, OTP-025
+
+## OTP-027 — Universal directional evolution
+
+**Status:** Open; semantics selected
+
+**Release target:** Phase 6
+
+### Problem
+
+Gradual assignability is weaker than a guarantee that all old implementations or consumers remain compatible.
+
+### Selected policy
+
+Use explicit universal-guarantee relation context with shared normalized rules. Implementers compare old to new; consumers compare new to old. Any-dependent assumptions remain unknown.
+
+### Acceptance tests
+
+- Test the change table in CONTRACT_ENGINE.md in both directions.
+- Do not infer transitivity through Any or unsupported forms.
+- Test breaking=True for a known incompatible direction, False only when both compatible, None otherwise.
+- CI rejects unknown required directions by default and never treats falsey unknown results as approval.
+
+### Related work
+
+OTP-004, OTP-023, OTP-028
+
+## OTP-028 — Evidence, truthiness, and enforcement
+
+**Status:** Open; exact policy selected
+
+**Release target:** 0.1 blocker
+
+### Problem
+
+A result must distinguish metadata conclusions from caller willingness to tolerate uncertainty.
+
+### Selected policy
+
+CONTRACT_ENGINE.md owns the exact status/completeness/truthiness/acceptance table. No public assurance enum. Strict is default; permissive accepts only annotation_missing and gradual_type.
+
+### Acceptance tests
+
+- Test every truth-table row, mixed mismatches/unknowns, empty contracts, and complete failures.
+- Test AND/OR relation logic and dependent unassessed obligations.
+- check() findings do not change with enforcement policy; accepted() and validate() share one function.
+- bool(UNKNOWN) is false and no unsupported/uninspectable capability is silently accepted.
+
+### Related work
+
+OTP-013, OTP-022
+
+## OTP-029 — Developer experience and report presentation
+
+**Status:** Open; presentation specification and illustrative scenarios selected
+
+**Release target:** 0.1 presentation; observed usability gate before public beta
+
+### Problem
+
+Accurate findings are insufficient if users cannot understand the failed operation, distinguish unknown evidence, or discover the right next step. A polished UI must not create a second compatibility engine.
+
+### Selected policy
+
+EXPERIENCE_DESIGN.md owns user journeys, result language, plain-text rendering, progressive disclosure, and usability targets. Result rendering is a pure view over evidence. The 0.1 UI is the Python API, editor types, reports, and documentation; a separate dashboard is not planned.
+
+### Acceptance tests
+
+- Exercise compatible, incompatible, unknown, mixed, definition-failure, and empty-contract reports using the actual implementation.
+- Verify strict/permissive decisions against the engine's acceptance table; permissively accepted UNKNOWN remains UNKNOWN.
+- Verify plain str/repr output, no hidden logging or candidate repr calls, control-character escaping, and readable 60/80-column output.
+- Use symbolic call-shape counterexamples only when established without candidate execution.
+- Type-check and execute the quickstart against the installed package; a design stub does not satisfy execution.
+- Run the five-participant usability exercise and record observed results before declaring the beta experience gate passed.
+
+### Related work
+
+OTP-022, OTP-026, OTP-028; later CLI presentation also depends on OTP-023/027.
 
 ## Release gates
 
-### 0.1 must resolve or explicitly freeze policy for
+0.1 must satisfy OTP-003, 004, common 005, 010, instance 011, basic 012, 013, explicit-policy 014, 015, basic 016, 020, 021, initial 022, baseline 024, 025, 026, 028, and the 0.1 presentation requirements of 029 for exactly the roadmap subset.
 
-- OTP-001 — Interface bridge portability
-- OTP-003 — callable call-shape compatibility
-- OTP-004 — core runtime assignability
-- OTP-005 — common annotation resolution
-- OTP-010 — checker parity policy
-- OTP-012 — basic attribute/property semantics
-- OTP-013 — definition vs candidate errors
-- OTP-015 — decorator/signature recovery policy
-- OTP-016 — basic async semantics
-- OTP-020 — mutation/cache policy
-- OTP-021 — cache/thread safety
-- OTP-022 — initial error contract
-- OTP-025 — Python support matrix
+OTP-001/002 are independent experimental shorthand gates. OTP-006/007, 008/009, 017/018/019, 023, and 027 are later feature gates; they are mandatory only before the corresponding support is advertised. A stable 1.0 can document a deliberately bounded subset.
 
-### Pre-1.0 correctness expansion
+## Maintenance
 
-- OTP-006 — generic specialization
-- OTP-007 — generic variance
-- OTP-008 — overloads, if advertised
-- OTP-017 — nested protocols
-- OTP-018 — `Self`, if advertised
-- OTP-023 — versioned schema if public before 1.0
-- OTP-024 — benchmark baseline and performance policy
-
-### Explicitly advanced/deferred until spec-driven implementation exists
-
-- OTP-009 — advanced callable typing
-- OTP-019 — typed `**kwargs` / `Unpack[TypedDict]`
-
-## Maintenance rule
-
-When an open problem is solved:
-
-1. add or update conformance tests;
-2. record the durable architectural decision in `DESIGN_DECISIONS.md`;
-3. update the relevant focused design document;
-4. mark the OTP item **Resolved** with the release/version that resolved it;
-5. never remove the historical problem statement unless it is superseded by an ADR or equivalent permanent design record.
-
-Stipulate should prefer an explicit unsupported diagnostic over a superficially working implementation whose semantics are not proven.
+For a resolved item, commit acceptance tests, update the focused specification and durable decision, record the actual release and test matrix, and mark it resolved. Preserve the historical problem statement or link its superseding decision/archive. Update release scope in the same change when a feature moves stages.

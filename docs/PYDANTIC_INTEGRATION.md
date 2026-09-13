@@ -1,169 +1,54 @@
 # Pydantic Integration
 
-## Status
+## Status and boundary
 
-**Post-1.0 optional integration.**
+Optional and post-1.0. Pydantic must not be a core dependency or change core compatibility results when installed. The integration layer consumes stable Stipulate APIs; Stipulate does not depend on it.
 
-Pydantic must not be a hard dependency of Stipulate core.
+Pydantic can validate values and serialize application data. Stipulate compares structural declarations and explains compatibility. Neither engine substitutes for the other.
 
-## Principle
+## Ordinary model types in signatures
 
-> **Stipulate owns structural contracts. Pydantic can enhance value validation and serialization where those concerns naturally intersect.**
-
-The two projects solve complementary problems:
-
-- Pydantic validates data and runtime values.
-- Stipulate validates and evolves object/interface contracts.
-
-Integration should preserve that boundary rather than coupling the two engines.
-
-## Packaging
-
-Core installation remains independent:
-
-```text
-pip install stipulate
-```
-
-Pydantic-specific capabilities may be exposed through an optional extra:
-
-```text
-pip install "stipulate[pydantic]"
-```
-
-and a clearly isolated integration namespace where useful:
+A Pydantic model can appear as an ordinary nominal type in a supported Protocol signature without special coupling:
 
 ```python
-from stipulate.pydantic import ...
-```
-
-Installing or not installing Pydantic must not change Stipulate's core contract compatibility semantics.
-
-## Natural integration points
-
-### Pydantic models in interface signatures
-
-Pydantic models are ordinary Python types and should compose naturally with Stipulate interfaces:
-
-```python
+from typing import Protocol
 from pydantic import BaseModel
-from stipulate import Interface
-
+from stipulate import Contract
 
 class User(BaseModel):
     id: int
     name: str
 
-
-class Repository(Interface):
+class Repository(Protocol):
     def get(self, id: int) -> User | None: ...
-    def save(self, user: User) -> None: ...
+
+repository_contract = Contract(Repository)
 ```
 
-This requires no special runtime coupling for the basic contract declaration. Post-1.0 documentation should explicitly show the pairing.
+Stipulate checks the declared nominal relationship. It does not validate model fields, instantiate User, or inspect future method results. Small examples can ship before the post-1.0 integration package.
 
-### Optional current-value validation
+Annotated constraints, including Pydantic PositiveInt-style aliases, do not become nominal subtypes in Stipulate. The core uses the underlying type and does not enforce constraint metadata. Do not use such aliases as examples of parameter narrowing. [Pydantic type documentation](https://pydantic.dev/docs/validation/latest/concepts/types/)
 
-Stipulate's core contract engine reasons about member/type compatibility. A separate optional mode may validate current instance attribute/property values using Pydantic `TypeAdapter` where appropriate.
+## Optional current-value checking
 
-Example conceptual API, not frozen:
+A later explicit integration may use TypeAdapter to inspect current attribute/property values. This is a separate operation with explicit attribute-access effects, not an implicit addition to ordinary Contract.check(). Its API is not frozen here.
 
-```python
-Service.validate(candidate, values="pydantic")
-```
+Do not coerce a value and discard the replacement while returning the unchanged candidate as validated. Value checking should be non-coercing, or transformation must be a separately named operation that returns the transformed artifact. A successful value check does not prove writable declaration compatibility or future behavior.
 
-or an integration-specific method/helper under `stipulate.pydantic`.
+## Report exports
 
-The API should be chosen only after the core distinction between declaration compatibility and current-value validation is stable.
+Optional Pydantic representations may help users expose results through APIs, logs, or FastAPI. They consume stable core exports; core Evidence and CompatibilityResult do not inherit from BaseModel.
 
-Pydantic value validation must not be mistaken for proof of callable/interface assignability.
+JSON Schema for report data is different from the versioned Stipulate contract schema. Installation of an export helper must not affect core serialization or relation results.
 
-### Serializable result/report models
+## Packaging and gates
 
-Stipulate's `CompatibilityResult`, `CompatibilityReport`, `Evidence`, and contract schema data may have optional Pydantic representations or export helpers for users building APIs and tooling.
+Use a separate namespace and optional stipulate[pydantic] extra only once an implementation is justified. Before first-class integration:
 
-Possible benefits:
+- Core public results and relevant schema APIs are stable.
+- Current-value versus declaration guarantees are settled.
+- Access effects and coercion policy are tested.
+- Independent version compatibility is documented.
+- Examples show a meaningful improvement over directly using Pydantic.
 
-- JSON serialization;
-- FastAPI response models;
-- validation of externalized Stipulate reports;
-- easier logging/event pipelines;
-- generated JSON Schema for the **report data**, distinct from the Stipulate contract schema itself.
-
-Core result objects should not need to inherit from `BaseModel`.
-
-### FastAPI integration
-
-FastAPI is a natural demonstration of the boundary:
-
-```python
-class PaymentRequest(BaseModel):
-    amount: Decimal
-
-
-class PaymentProvider(Interface):
-    async def charge(self, request: PaymentRequest) -> PaymentResult: ...
-```
-
-Pydantic/FastAPI validate request and response data while Stipulate validates a dynamically loaded or dependency-injected provider implementation.
-
-Post-1.0 integration work may include documentation and small helpers if real use cases justify them. Stipulate should not become a dependency injection framework.
-
-### Contract/report tooling
-
-Where Stipulate schemas, snapshots, or compatibility reports need to be consumed as ordinary application data, optional Pydantic models may provide a convenient typed representation.
-
-This is an integration/export concern. The canonical Stipulate contract schema remains owned and versioned by Stipulate.
-
-## Explicit non-goals
-
-Pydantic integration must not:
-
-- make Pydantic a core dependency;
-- make `Interface` inherit from `BaseModel`;
-- use Pydantic as Stipulate's callable assignability engine;
-- delegate structural contract compatibility to `TypeAdapter`;
-- change compatibility results depending on whether Pydantic is installed;
-- make Stipulate contract schemas aliases for JSON Schema;
-- leak Pydantic-specific metadata into the canonical core contract IR;
-- force Pydantic onto downstream implementations;
-- delay core releases because of Pydantic compatibility work.
-
-## Dependency direction
-
-The architecture must remain:
-
-```text
-stipulate core
-      ↑
-stipulate.pydantic
-```
-
-not:
-
-```text
-stipulate core → pydantic
-```
-
-The integration layer consumes stable Stipulate APIs.
-
-## Versioning
-
-Pydantic compatibility should have its own documented support matrix once the integration ships.
-
-A breaking change in Pydantic must not force a breaking change to Stipulate's core contract format or semantics.
-
-## Release gate
-
-Do not begin first-class Pydantic integration until after 1.0 unless a small documentation-only example is useful earlier.
-
-Before implementation:
-
-1. core `Contract`, `CompatibilityResult`, and schema APIs must be stable;
-2. declaration compatibility versus current-value validation must be formally settled;
-3. benchmarks must show optional value validation does not accidentally become part of ordinary contract checks;
-4. integration APIs must demonstrate meaningful ergonomics over users directly calling Pydantic themselves.
-
-## Success criterion
-
-Pydantic users should feel that Stipulate fits naturally beside Pydantic without either project pretending to solve the other's problem.
+FastAPI can serve as a later example: it validates request/response data while Stipulate checks a dynamically selected service declaration. Stipulate remains independent of dependency injection and web frameworks.

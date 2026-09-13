@@ -4,166 +4,125 @@
 
 **Define. Validate. Evolve.**
 
-Stipulate turns Python structural interfaces into contracts you can use with existing type checkers, validate at runtime, and compare as they evolve.
+Stipulate checks dynamically supplied implementations against Python structural interfaces, explains mismatches, and preserves what available metadata cannot establish.
 
-```python
-from stipulate import Interface
+## Status
 
+This repository contains the design specification and small design probes. It does not yet contain an installable Stipulate implementation. The examples below describe the planned 0.1 API. Earlier prototypes are historical inputs, not evidence that release gates have passed.
 
-class Repository(Interface):
-    def get(self, id: int) -> str | None: ...
-
-    async def save(self, id: int, value: str) -> None: ...
-
-
-repo = Repository.validate(candidate)
-```
-
-Implementations remain ordinary Python classes. They do not need to inherit from Stipulate, register themselves, or use decorators.
-
-## Define
-
-```python
-class Storage(Interface):
-    def read(self, key: str) -> bytes | None: ...
-```
-
-Interfaces remain useful to Python's structural typing ecosystem and are designed to work with existing type checkers.
-
-## Validate
-
-Enforce the contract:
-
-```python
-storage = Storage.validate(candidate)
-```
-
-Or inspect compatibility without raising:
-
-```python
-result = Storage.check(candidate)
-
-if result:
-    register(candidate)
-
-result.errors()
-result.unknowns()
-result.evidence
-```
-
-Stipulate checks more than member presence: call shape, parameter and return assignability, async behavior, properties, attributes, and inheritance all contribute to compatibility.
-
-Validation returns the original object when successful.
-
-## Evolve
-
-```python
-report = StorageV1.compare(StorageV2)
-```
-
-The same compatibility engine used for runtime validation is designed to analyze interface evolution, including separate effects on implementers and consumers.
-
-```python
-report.breaking
-report.implementers
-report.consumers
-report.changes
-```
-
-## Contract metadata
-
-Every Stipulate interface exposes its compiled contract:
-
-```python
-Storage.contract
-Storage.schema()
-Storage.fingerprint()
-```
-
-Schemas, fingerprints, snapshots, and future CI tooling all derive from the same contract representation.
-
-## Existing Protocols
-
-Existing Python `Protocol` declarations can opt in without rewriting implementations:
+## Define and validate
 
 ```python
 from typing import Protocol
 from stipulate import Contract
 
 
-class StorageProtocol(Protocol):
+class Storage(Protocol):
     def read(self, key: str) -> bytes | None: ...
 
+    async def write(self, key: str, value: bytes) -> None: ...
 
-Storage = Contract(StorageProtocol)
 
-Storage.validate(candidate)
-Storage.check(candidate)
-Storage.compare(other)
+class MemoryStorage:
+    def __init__(self) -> None:
+        self._items: dict[str, bytes] = {}
+
+    def read(self, key: str) -> bytes | None:
+        return self._items.get(key)
+
+    async def write(self, key: str, value: bytes) -> None:
+        self._items[key] = value
+
+
+candidate = MemoryStorage()
+storage_contract = Contract(Storage)
+storage = storage_contract.validate(candidate)
 ```
 
-This is the zero-migration adoption path for existing typed codebases.
+Implementations are ordinary Python classes. They need no inheritance, registration, or decorators. Validation returns the original object, typed as `Storage`, after checking its available declarations against the contract. The constructor uses TypeForm for inference; the [typing guide](docs/STATIC_TYPING.md) records supported checker settings, including the current mypy feature flag.
 
-## Example failure
+Strict validation is the default: incompatible or insufficient evidence raises `ContractError`. To allow missing implementation type annotations deliberately, use `strict=False`; known mismatches and unsupported or uninspectable candidate capabilities still fail. Invalid requirements fail contract construction.
 
-```text
-2 contract errors for Repository
-
-get.id
-  Implementation parameter type is too narrow
-  expected implementation to accept: int
-  implementation accepts: PositiveInt
-  [type=parameter_type]
-
-save
-  Expected async method
-  [type=async_mismatch]
-```
-
-Failures raise `ContractError`. Invalid or unresolvable contract definitions use `ContractDefinitionError`.
-
-## Public model
-
-The intended API stays centered on the contract itself:
+## Understand a result
 
 ```python
-Storage.validate(obj)
-Storage.check(obj)
-Storage.compare(StorageV2)
-Storage.contract
-Storage.schema()
-Storage.fingerprint()
+result = storage_contract.check(candidate)
+print(result)
+
+if result:
+    print("Storage declarations are compatible")
+
+result.status
+result.complete
+result.errors()
+result.unknowns()
+result.evidence
 ```
 
-Advanced users can work with `Contract` directly. Free functions may exist internally or as narrowly justified typing fallbacks, but they are not the primary user interface.
+`check()` reports candidate mismatches without raising `ContractError`. Truthiness means compatibility was established for every requirement; unknown evidence is false. Invalid contract definitions raise `ContractDefinitionError`. The result includes locations, reasons, and suggested fixes.
 
-## What Stipulate is not
+Stipulate compares signatures, annotation assignability, binding, and supported member capabilities. It assumes implementations honor their declarations; it does not execute methods to verify their behavior, validate future return values, or prevent later mutation. Annotation resolution may execute Python annotation expressions in the default trusted mode.
 
-Stipulate is not a static type checker, general function instrumentation system, dependency injection framework, behavioral pre/postcondition library, or replacement for Python's typing specification.
+## Friendly errors
 
-Its focus is structural interface contracts.
+```text
+2 contract errors for Storage
+
+read.key
+  Parameter is too narrow: the contract permits str, but the implementation accepts bytes.
+  Accept str (or a compatible broader type).
+  [parameter_type]
+
+write
+  A coroutine method is required, but the implementation is synchronous.
+  [async_mismatch]
+```
+
+## Interface shorthand — experimental design target
+
+```python
+from stipulate import Interface
+
+class Storage(Interface):
+    def read(self, key: str) -> bytes | None: ...
+
+storage = Storage.validate(candidate)
+```
+
+This shorthand is not a 0.1 promise. It must preserve structural typing, precise class-side methods, inheritance, and clean protocol members in installed-package Pyright/mypy tests before promotion. The supported 0.1 plan uses `Protocol` plus `Contract`, with the same method-based operations and compatibility engine.
+
+## Evolution and tooling — later releases
+
+```python
+report = Contract(StorageV1).compare(Contract(StorageV2))
+schema = storage_contract.schema()
+fingerprint = storage_contract.fingerprint()
+```
+
+Comparison will report implementer and consumer compatibility separately. Unknown results cannot certify a non-breaking change. Schemas and fingerprints will be versioned before publication. None of these three operations is in the 0.1 public surface.
 
 ## Documentation
 
+Start with the [quickstart](docs/QUICKSTART.md). The [experience design](docs/EXPERIENCE_DESIGN.md) specifies the API journey, readable reports, and usability bar.
+
 - [Product Vision](docs/PRODUCT_VISION.md)
-- [Contract Engine](docs/CONTRACT_ENGINE.md)
 - [Public Interface Model](docs/INTERFACE_MODEL.md)
+- [Contract Engine](docs/CONTRACT_ENGINE.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Type System and Assignability](docs/TYPE_SYSTEM.md)
+- [Type System](docs/TYPE_SYSTEM.md)
 - [Validation Engine](docs/VALIDATION_ENGINE.md)
-- [Static Typing Strategy](docs/STATIC_TYPING.md)
-- [Error Model](docs/ERROR_MODEL.md)
+- [Static Typing](docs/STATIC_TYPING.md)
+- [Errors](docs/ERROR_MODEL.md)
 - [Performance and Caching](docs/PERFORMANCE.md)
-- [Testing Strategy](docs/TESTING_STRATEGY.md)
-- [Compatibility Policy](docs/COMPATIBILITY.md)
-- [Competition Evaluation](docs/COMPETITION.md)
-- [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
-- [Roadmap](docs/ROADMAP.md)
+- [Testing](docs/TESTING_STRATEGY.md)
+- [Compatibility](docs/COMPATIBILITY.md)
+- [Dependencies](docs/DEPENDENCIES.md)
+- [Competition](docs/COMPETITION.md)
+- [Pydantic Integration](docs/PYDANTIC_INTEGRATION.md)
+- [Roadmap and release matrix](docs/ROADMAP.md)
 - [Design Decisions](docs/DESIGN_DECISIONS.md)
 - [Implementation Plan](docs/IMPLEMENTATION_PLAN.md)
+- [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md)
+- [Design probes](design_probes/README.md)
 
-The [Open Technical Problems](docs/OPEN_TECHNICAL_PROBLEMS.md) register is the authoritative backlog for unresolved correctness and compatibility questions.
-
-## Status
-
-Stipulate is in design/prototype stage. The prototype has exercised the `class Foo(Interface):` model, variance-aware runtime validation, structured compatibility evidence, contract serialization/fingerprints, and directional interface comparison.
+The roadmap owns release scope; design decisions own durable policy; focused specifications own behavior; the open-problem register owns implementation evidence and unresolved acceptance work. Contradictions must be reconciled in the same change. A decision does not count as a tested implementation.

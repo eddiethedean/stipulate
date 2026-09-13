@@ -1,79 +1,45 @@
 # Compatibility Policy
 
-## Scope
+## Runtime targets
 
-Stipulate sits at the intersection of Python runtime introspection and Python's evolving typing system. Compatibility therefore includes more than ordinary API stability.
+Planned minimum: CPython 3.11, with requires-python >=3.11 in future package metadata. The initial release test targets are CPython 3.11, 3.12, 3.13, and 3.14. This design checkout does not yet claim tested Stipulate support on any of them.
 
-The project must track Python runtime versions, `typing` semantics, `typing_extensions` where needed, mypy behavior, Pyright/Pylance behavior, public Stipulate API stability, structured error stability, and contract schema stability.
+Advertise a minor version only after compilation, annotation resolution, signature normalization, supported type relations, evidence, lifecycle, and installed-package tests pass. Import success is insufficient. PyPy and other implementations are outside the initial support claim.
 
-## Python versions
+Newer annotation metadata must be handled deliberately, including deferred evaluation. New interpreter features do not automatically expand the supported type-form subset. Use typing_extensions when its behavior is tested; do not invent unavailable runtime metadata.
 
-**Minimum supported Python version: 3.11.**
+## Checkers and packaging
 
-Package metadata should declare:
+Pyright strict is permanent for first-party code. Public fixtures also run on supported mypy configurations. Record exact versions and required feature flags; the current design probe's mypy 1.19.1 requires its TypeForm flag. No required checker plugin or consumer ignores.
 
-```toml
-requires-python = ">=3.11"
-```
+The TypeForm constructor and inferred return type are part of the public contract. Test installed wheels and sdists outside the source tree with py.typed and any required stubs present. Do not claim that local declaration probes prove package behavior.
 
-The project should test every supported minor version in CI.
+## Typing semantics and runtime policy
 
-The initial matrix should include Python 3.11 and every newer generally available Python release that Stipulate supports. New Python versions should be added promptly once dependencies and CI tooling are ready.
+The typing specification governs supported annotation relations. Strict evidence, trusted/raw annotation evaluation, static inspection limits, and the initial coroutine-kind rule are explicit Stipulate policies. Document intentional differences from ordinary checker assignment behavior.
 
-Do not claim compatibility with a Python version unless the `Interface` bridge, annotation resolution, signature normalization, contract compilation, runtime validation, and typing fixtures pass on that version.
+Supported constructs form a versioned subset. New support can turn UNKNOWN into COMPATIBLE or INCOMPATIBLE; treat resulting acceptance changes as observable behavior and explain them in release notes. Never market strict validation as method-body or future-value enforcement.
 
-### Newer-version typing features
+## Versioning
 
-The package-wide minimum should not be raised merely to use newer typing features.
+During 0.x, call out breaking API, policy, diagnostic, or supported-subset changes clearly. At 1.0, semantic versioning covers documented Python APIs, supported compatibility semantics, enforcement defaults, diagnostic fields/codes, and public schema versions.
 
-Stipulate may provide richer behavior conditionally on newer Python versions when the runtime exposes additional typing metadata or semantics. For example, Python 3.12+ features may receive enhanced support while Python 3.11 remains fully supported for the documented 3.11 feature set.
+Correctness fixes can legitimately reject previously accepted candidates. Classify and document their impact; do not quietly claim acceptance is unchanged because a change is a bug fix.
 
-Use `typing_extensions` where it provides a correct and mature compatibility bridge. Do not emulate runtime metadata that does not actually exist on older interpreters.
+## Schema and diagnostics
 
-### Raising the minimum
+Public schema()/fingerprint() follow their later release gate, including explicit schema versions and identity/portability policy. Internal IR records are not a public interchange format.
 
-Raising the minimum Python version is a deliberate compatibility decision. It should happen only when maintaining the older version materially harms correctness, maintainability, security, or access to required typing/runtime capabilities.
+Diagnostic location, code, serialized fields, and semantic category become stable at 1.0. Exact human wording remains free to improve. Unknown and incompatible categories must remain distinguishable.
 
-## Private typing internals
+## Mutation and evaluation
 
-The prototype demonstrates that runtime protocol machinery can be composed successfully, but private implementation details such as `_ProtocolMeta` must not become public API.
+Contracts are immutable requirement snapshots; refresh=True makes a new snapshot. Candidate checks are point-in-time and are repeated after candidate mutation. Trusted annotation evaluation can execute expressions; raw mode does not request evaluation and can produce unresolved evidence. Neither mode is a security boundary.
 
-Where private behavior is unavoidable internally, isolate it behind a compatibility module and test it across all supported Python versions.
+## Dependencies and integrations
 
-## Static checkers
+Core results must not change merely because Pydantic or another optional integration is installed. Third-party annotation metadata is not supported implicitly. Raising Python/dependency minimums requires an explicit compatibility decision and a tested migration path.
 
-Pyright strict is the first-party typing standard for Stipulate itself. The repository must remain clean under Pyright `typeCheckingMode = "strict"` from the first implementation onward.
+## Deprecation
 
-The public user experience must remain useful without checker-specific plugins. Compatibility fixtures should cover both Pyright and mypy.
-
-## Typing specification
-
-Python's typing specification is the primary semantic reference for assignability rules. Checker behavior is useful evidence, but Stipulate should not blindly copy checker-specific bugs or extensions.
-
-## Semantic versioning
-
-Before 1.0, rapid iteration is expected, but breaking changes should still be called out clearly.
-
-For 1.0 and later, semantic versioning should cover public Python APIs, compatibility semantics for supported constructs, documented configuration behavior, stable structured error fields/codes, and serialized contract schema versions.
-
-## Schema versioning
-
-`schema()` output should contain an explicit schema version before consumers are encouraged to persist or exchange it.
-
-Changes that alter serialized meaning should bump the schema version even when the Python package remains within a compatible API release.
-
-## Error compatibility
-
-At 1.0, error type codes, location structure, and broad semantic meaning become stable. Exact prose should not be considered machine-stable.
-
-## Runtime mutation
-
-Validation is a point-in-time assertion. A validated implementation can potentially be monkey-patched later. Stipulate does not guarantee future conformance unless a future explicit enforcement/proxy feature is used.
-
-## Third-party typing constructs
-
-Support for third-party annotation systems should not be implied automatically. Integrations may be added deliberately, but the built-in Python typing model remains the baseline.
-
-## Deprecation policy
-
-Once 1.0 is reached, public API deprecations should normally remain for at least one minor release before removal unless retaining them creates a correctness or security issue.
+At 1.0, announce deprecations and normally retain them through at least one minor release, with removal in a major release. An exceptional correctness/security removal must explain why ordinary deprecation was insufficient.

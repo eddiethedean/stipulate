@@ -1,269 +1,113 @@
 # Implementation Plan
 
-## Objective
+## Objective and scope
 
-Turn the validated prototype into a maintainable production package without losing the typing semantics that make Stipulate valuable.
+Deliver an approachable structural-contract library whose type inference, diagnostics, and runtime semantics reinforce each other. ROADMAP.md owns the supported 0.1 matrix. EXPERIENCE_DESIGN.md owns the user journeys and presentation bar. The current repository contains specifications and design probes, not a working package.
 
-The authoritative unresolved-engineering backlog is [OPEN_TECHNICAL_PROBLEMS.md](OPEN_TECHNICAL_PROBLEMS.md). Implementation work must map semantic changes to OTP items and satisfy their acceptance criteria before those problems are considered resolved.
+Each slice must demonstrate a complete user task with a positive case, meaningful failure or uncertainty, precise public types, and an executable example. A slice can be deliberately narrow internally; only the complete roadmap matrix is advertised as 0.1 support.
 
-## Non-negotiable project invariant: Pyright strict
+## Permanent engineering rules
 
-Stipulate is **Pyright strict from the first implementation commit onward**.
+Pyright strict passes from the first implementation commit. Public fixtures also pass the pinned mypy configuration, including its TypeForm flag when required. No public Any leakage, consumer ignores, or equality fallback for unsupported forms.
 
-The repository must configure:
+Keep immutable requirement IR, ephemeral candidate evidence, enforcement policy, and presentation separate. A view must not reimplement the compatibility engine. Tests verify semantic outcomes independently of rendered wording.
 
-```json
-{
-  "typeCheckingMode": "strict"
-}
-```
+## Slice 1 — A reproducible typed installation
 
-or the equivalent `pyproject.toml` setting.
+**User outcome:** An installed package recognizes Contract(Storage) as Contract[Storage] and preserves Storage through validate().
 
-A change is not merge-ready if first-party code fails Pyright strict.
+Create package metadata, py.typed, source/test directories, pytest, Ruff, Pyright strict, mypy fixtures, and distribution CI. Prove TypeForm[T] constructor inference, negative type-argument cases, and explicit Protocol composition outside the source tree using installed wheel and sdist builds.
 
-Do not defer typing cleanup to later milestones. Dynamic runtime behavior must be isolated behind small normalization boundaries rather than allowing `Any` to spread through the contract engine.
+**Evidence to review:** Exact type assertions, expected negative diagnostics, clean-environment installation logs, and pinned checker/dependency settings. A stub proves only static shape until runtime behavior exists.
 
-Broad ignores, disabled strict diagnostics, or file-wide checker suppressions are not acceptable substitutes for design work. Narrow suppressions are permitted only for genuine checker limitations and must be documented.
+**Exit gate:** Reproducible package and checker results on the initial CPython 3.11–3.14 targets, with no advertised runtime feature inferred merely from import success. Maps to OTP-010/025/026.
 
-## Milestone 1 — Package foundation
+## Slice 2 — First validation, first useful failure
 
-Create the package skeleton around the contract engine:
+**User outcome:** A fully annotated single-method Protocol accepts a compatible implementation, rejects an incompatible parameter, and explains a missing candidate return annotation.
 
-```text
-src/stipulate/
-    __init__.py
-    _interface.py
-    _contract.py
-    _compile.py
-    _members.py
-    _signatures.py
-    _assignability.py
-    _annotations.py
-    _compatibility.py
-    _evidence.py
-    _errors.py
-    _cache.py
+Implement the smallest real compiler/IR, candidate inspection, nominal parameter/return relation, immutable evidence, three-valued result, enforcement function, ContractError/ContractDefinitionError, and plain result/exception presenter. Use strict defaults from day one. Return the original candidate on success.
 
-tests/
-typing_tests/
-benchmarks/
-```
+This slice initially supports only the narrow forms needed for its example; unsupported forms fail explicitly. Do not simulate a complete engine with unconditional casts or return an unimplemented happy path.
 
-Add:
+**Evidence to review:** The quickstart runs against the implementation. Compatible, incompatible, unknown, invalid-definition, and empty-contract examples render accurately. print(result) has no additional candidate access. The basic runtime-to-error loop can be demonstrated before the broader type system is built.
 
-- `pyproject.toml`;
-- Pyright with `typeCheckingMode = "strict"`;
-- pytest;
-- mypy interoperability fixtures;
-- Ruff or equivalent linting;
-- coverage;
-- CI across supported Python versions;
-- Hypothesis for property-based compatibility tests when the first assignability engine lands.
+**Exit gate:** Tests agree on bool(result), complete, accepted(strict=...), exception contents, and inferred return type. Maps to OTP-003/004/013/022/026/028/029 for this narrow slice.
 
-Pyright strict must pass before Milestone 1 is considered complete.
+## Slice 3 — Every legal call
 
-## Milestone 2 — Interface bridge
+**User outcome:** Plugin authors can understand and repair signature failures involving keyword names, parameter kinds, defaults, and variadics.
 
-Implement and freeze the smallest possible runtime bridge supporting:
+Expand deterministic call-shape containment, standard bound-method normalization, exposed-signature precedence, and coroutine-kind policy. Add wrapper-cycle protection, unsupported-signature evidence, and independent multi-error aggregation.
 
-```python
-class Foo(Interface):
-    ...
-```
+Use a symbolic required-call example when the algorithm can establish one without executing the candidate. Keep generated behavioral calls outside the core.
 
-Requirements:
+**Evidence to review:** Specification fixtures and bounded property-test oracles cover all parameter-kind interactions. The call-shape report scenario is produced by real code and explains a concrete failed obligation.
 
-- `Foo` is a genuine runtime protocol;
-- framework methods do not become protocol members;
-- inheritance remains valid;
-- ordinary static structural typing works;
-- the bridge and its stubs/typing representation pass Pyright strict;
-- behavior is regression-tested across every supported Python version.
+**Exit gate:** No sampled-call production algorithm, no swallowed inspection/internal failures, and no permissive acceptance of unknown signatures. Maps to OTP-003/014/015/016/022.
 
-The desired method-first API must remain an explicit typing design target:
+## Slice 4 — The promised type subset
 
-```python
-Foo.validate(obj)
-Foo.check(obj)
-Foo.compare(FooV2)
-```
+**User outcome:** Ordinary annotated plugins using the roadmap's unions, literals, nominal types, and supported collections receive accurate directional outcomes.
 
-Do not normalize checker errors around these methods with blanket ignores.
+Implement exactly the finite type/origin table in TYPE_SYSTEM.md. Cover numeric promotions, Literal value/type identity, Annotated metadata treatment, collection variance/substitution, deliberate Any evidence, and unsupported-identity rejection.
 
-## Milestone 3 — Contract IR
+Complete common trusted/raw annotation resolution with correct requirement/candidate namespaces, TYPE_CHECKING-name limitations, explicit local namespaces, and version-specific deferred annotations. Unsupported recursive and advanced forms terminate with diagnostics.
 
-Implement the immutable semantic core:
+**Evidence to review:** A specification-indexed corpus showing expected, Pyright, mypy, and Stipulate outcomes; intentional policy differences; annotation-effect tests; and mixed incompatible/unknown results.
 
-- `Contract`;
-- typed contract member records;
-- normalized callable/signature model;
-- normalized type-expression representation where needed;
-- inherited member collection;
-- annotation resolution;
-- canonical serialization foundation;
-- weak-reference compilation cache.
+**Exit gate:** Every promised type form has positive, negative, and unknown/definition-error cases. Gradual assignability is never treated as universally transitive. Maps to OTP-004/005/010/013/028.
 
-The compiler contains no candidate-specific validation state.
+## Slice 5 — Supported storage and properties
 
-All IR types should be precise enough to keep the compatibility engine free of pervasive `Any`.
+**User outcome:** Implementations with documented plain attributes and standard properties can be checked without reading through user getters.
 
-## Milestone 4 — Evidence and errors
+Add declared read/write capabilities and separate presence checks. Test read covariance, write contravariance, annotations-only storage, uninitialized slots, and mismatches hidden by a currently matching value. Unsupported dynamic dispatch, descriptors, and class-object candidates remain explicit limitations.
 
-Implement structured evidence and result models before expanding validation logic:
+**Evidence to review:** Getter/descriptor/hook counters remain untouched. The diagnostic identifies whether presence, read type, write type, or inspectability is the problem.
 
-- `Evidence`;
-- `CompatibilityResult`;
-- `ContractError`;
-- `ContractDefinitionError`.
+**Exit gate:** No current-value proof of writable declarations and no implicit value validation. Maps to OTP-011/012/014/022.
 
-Distinguish proven, incompatible, and unknown evidence explicitly.
+## Slice 6 — Reuse, mutation, and reliability
 
-## Milestone 5 — Callable compatibility
+**User outcome:** Framework authors retain one Contract and safely check many independent candidates, with explicit behavior when declarations change.
 
-Implement call-shape compatibility independently from type assignability:
+Add weak keys and weak IR values in the shared cache, snapshot refresh, custom-namespace cache bypass, and concurrent publication. Keep candidate state per call; do not cache successful candidates or exception tracebacks.
 
-1. positional-only;
-2. positional-or-keyword;
-3. keyword-only;
-4. defaults;
-5. extra required parameters;
-6. `*args`;
-7. `**kwargs`;
-8. binding normalization;
-9. async mismatch detection;
-10. decorator/signature recovery policy.
+**Evidence to review:** Collection of temporary/self-referential declarations, live-owner retention, independent old/new snapshots, failed refresh, concurrent first use, and candidate mutation. Profiles distinguish requirement compilation from candidate inspection.
 
-Build specification-oriented fixtures before advanced annotations.
+**Exit gate:** Lifecycle/concurrency suites pass and benchmark baselines exist without unmeasured latency claims. Maps to OTP-020/021/024.
 
-## Milestone 6 — Assignability engine
+## Slice 7 — Public beta experience
 
-Implement directional assignability explicitly:
+**User outcome:** A developer unfamiliar with the engine can validate an implementation, repair a mismatch, and interpret missing evidence from the shipped documentation.
 
-```python
-is_assignable(source, destination, context=...)
-```
+Complete all roadmap rows and run the scenario catalogue against real engine results. Check 60/80-column reports, long identifiers, terminal-control escaping, color-independent meaning, compact repr, and no implicit logging. Publish exact checker configuration and known limitations alongside the quickstart.
 
-Initial cases:
+Conduct the five-participant task exercise in EXPERIENCE_DESIGN.md. Record observed completion and interpretation results; missing participant evidence is not a passed gate. Fix the failing interaction and retest it without weakening compatibility policy.
 
-- identity;
-- `Any` with deliberate policy;
-- missing annotations under strict/permissive evidence rules;
-- `None`;
-- nominal subclass relationships;
-- unions;
-- `Literal`;
-- `Annotated` underlying type;
-- common generic forms with known variance.
+**Evidence to review:** Actual task observations, diagnostic examples, full-matrix CI, installed-package documentation execution, and a supported/unsupported feature inventory.
 
-Use parameter contravariance and return covariance correctly.
+**Exit gate:** All 0.1 semantic gates and OTP-029's beta experience criteria pass. There are no known cases where a supported incompatible declaration is accepted or unsupported evidence is presented as established compatibility.
 
-Unsupported constructs produce explicit unknown/unsupported evidence rather than equality fallback.
+## Slice 8 — 0.1 release decision
 
-## Milestone 7 — Attributes and properties
+Review one release evidence bundle containing the feature matrix, exact runtime/checker versions, conformance results, example runs, lifecycle tests, performance measurements, usability observations, and documented remaining limits.
 
-Implement separate semantic representations for readable/writable attributes and properties.
+Every advertised feature must trace to tests. Any unresolved release-blocking correctness or experience issue blocks publication; move scope explicitly in the roadmap and focused documents if needed. A screenshot, happy-path demo, or internal module completion is not a release gate.
 
-Do not infer declaration compatibility solely from a current runtime value.
+## Scope and prioritization rule
 
-Define policy for custom descriptors, dynamic members, and instance-only attributes.
+Prioritize work that closes a demonstrated failure in the primary journeys or a correctness gate for the supported subset. Add a feature only with its user problem, semantics, diagnostic behavior, release target, and acceptance evidence defined. Do not let optional CLI, Pydantic, native optimization, or Interface research delay the Contract core.
 
-## Milestone 8 — Method-first public API
+Track each work item with: user outcome, supported cases, unknown/error behavior, relevant OTP, evidence artifact, and current blocker. Establish time estimates after early slices provide measured implementation throughput; do not present invented dates or speed targets as commitments.
 
-Implement the intended public experience:
+## Later delivery
 
-```python
-Foo.validate(value)
-Foo.check(value)
-Foo.compare(FooV2)
-Foo.contract
-Foo.schema()
-Foo.fingerprint()
-```
+After the core, separately expand ordinary member/annotation support, user generics, and advanced callables. Stabilize canonical schema before schema()/fingerprint(), then prove directional evolution before compare()/CompatibilityReport. CLI/snapshots consume those APIs. Pydantic remains optional and post-1.0.
 
-Existing Protocols use:
+The Interface shorthand is an independent research gate. Promotion requires precise class-side typing, structural composition, clean member discovery, and installed-package tests in both checkers without consumer workarounds.
 
-```python
-contract = Contract(MyProtocol)
-contract.validate(value)
-```
+## Definition of done
 
-The method-first API is the design target. If Python typing limitations require a stub or narrowly scoped fallback mechanism, solve that explicitly without weakening repository-wide Pyright strict mode.
-
-## Milestone 9 — Checker conformance
-
-Create fixtures executed by Pyright strict and mypy.
-
-Verify:
-
-- structural implementation acceptance;
-- statically invalid implementations rejected;
-- method-first API typing;
-- precise validation return types;
-- `Contract(Protocol)` typing;
-- interface inheritance;
-- generic behavior only when actually supported;
-- no accidental public `Any` leakage.
-
-Pyright strict is mandatory. Mypy is an interoperability target, not a reason to weaken strict Pyright design.
-
-## Milestone 10 — Hardening
-
-Before the first public beta:
-
-- Hypothesis/property tests around signature shape and assignability invariants;
-- decorator/wrapper tests;
-- dynamic attribute tests;
-- forward-reference tests;
-- multi-evidence aggregation tests;
-- cache lifecycle/thread-safety tests;
-- mutation/cache policy tests;
-- benchmark baseline;
-- documentation examples executed and type-checked where practical.
-
-## Later milestones
-
-After the ordinary core is trustworthy:
-
-- generic specialization and variance;
-- overloads and advanced callable typing;
-- canonical schemas and fingerprints;
-- semantic interface evolution;
-- snapshot/CI tooling;
-- optional CLI via Typer/Rich;
-- optional post-1.0 Pydantic integration;
-- optional native/Rust core only if benchmarks justify it.
-
-## Implementation rules
-
-### Pyright strict forever
-
-Strict mode is permanent project policy across new modules, refactors, CLI code, optional integrations, and future releases.
-
-### Do not use annotation equality as a fallback
-
-Unsupported typing constructs must remain explicit.
-
-### Do not call candidate methods during structural validation
-
-Validation is introspective unless a future explicitly separate behavioral feature says otherwise.
-
-### Minimize private `typing` coupling
-
-Isolate CPython/runtime Protocol internals behind a small typed compatibility layer.
-
-### Prefer immutable compiled metadata
-
-Contracts should be safe to cache and share.
-
-### Treat open technical problems as release gates
-
-Happy-path code is not enough.
-
-## Definition of done for 0.1
-
-A 0.1 release must demonstrate the core contract experience while the repository passes Pyright strict with zero first-party errors.
-
-It should support ordinary interfaces with correct structural recognition, runtime validation, variance-aware callable checks, async checks, attributes/properties for documented cases, structured evidence/errors, cached compilation, explicit unsupported diagnostics, and supported Python versions proven in CI.
-
-Do not expand the feature set until this base is trustworthy.
+A developer can define a Protocol, validate a candidate, understand and repair a failure, and deliberately handle uncertainty. The package preserves precise types and the original object, passes its complete advertised test matrix, and communicates exactly what available declarations establish.

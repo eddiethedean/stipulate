@@ -1,103 +1,78 @@
-# Roadmap
+# Roadmap and Release Scope
 
-The roadmap defines delivery phases. The authoritative backlog of unresolved correctness and compatibility questions is [OPEN_TECHNICAL_PROBLEMS.md](OPEN_TECHNICAL_PROBLEMS.md). Roadmap work that changes semantics should map to one or more OTP items and satisfy their acceptance criteria before the feature is treated as complete.
+This document owns delivery scope. DESIGN_DECISIONS.md owns policy; focused documents own behavioral details; OPEN_TECHNICAL_PROBLEMS.md records unfinished implementation evidence. A selected policy is not a passed release gate.
 
-## Phase 0 — Prototype validation
+## Status
 
-Goal: prove the architecture before committing to public API stability.
+The repository is a design-stage project with isolated design probes. Prior prototype reports are historical and must be reproduced in versioned tests before being counted as production evidence.
 
-Completed/proven in prototype form include the `class Foo(Interface):` bridge, signature inspection, parameter contravariance, return covariance, call-shape checks, async mismatch detection, attributes/properties, inheritance, strict/permissive evidence behavior, structured findings, contract serialization/fingerprints, and directional comparison experiments.
+## Authoritative feature matrix
 
-Remaining prototype validation includes the final mypy/Pyright packaging matrix, multi-version Python verification, and clearer static-vs-runtime attribute semantics.
+| Capability | 0.1 scope | Later gate |
+| --- | --- | --- |
+| Declaration | Standard Protocol plus Contract(Protocol) | Interface shorthand: OTP-001/002 |
+| Methods | Ordinary instance def and coroutine async def; complete basic call-shape handling | Class/static methods, generators, callable objects: OTP-012/016 |
+| Type forms | None, nominal types and typing numeric promotions, Any evidence, unions, Literal, Annotated underlying types | Other forms remain explicit unsupported diagnostics |
+| Collections | list, set, dict, fixed/variadic tuple, Sequence, Iterable, Mapping with documented variance/origin relations | General generic specialization: OTP-006/007 |
+| Attributes | Declared plain storage and standard read/write properties, without getter execution | Custom/dynamic/generated descriptors: OTP-012/014 |
+| Resolution | Trusted/raw policies; common resolvable strings and legacy aliases; explicit namespaces | PEP 695 and recursive aliases: OTP-005 |
+| Enforcement | Strict by default; explicit limited permissive acceptance | No silent expansion of the allowlist |
+| Results | Three statuses, independent completeness, evidence, stable initial exports | Report schema stability by 1.0 |
+| Errors | ContractDefinitionError and ContractError from the start | Semver guarantees by 1.0 |
+| Caching | Retained Contract snapshot, weak global keys/values, explicit refresh | Automatic mutation tracking deferred |
+| Typing | TypeForm inference, Pyright strict, supported mypy configuration, installed-distribution fixtures | Broader checker versions after tests |
+| Developer experience | Plain str/repr reports, actionable diagnostics, complete quickstart | Observed beta usability: OTP-029 |
+| Internal IR | Immutable normalized records | Internal shape is not a public schema |
+| schema()/fingerprint() | Not public | Phase 5 / OTP-023 |
+| compare()/CompatibilityReport | Not public | Phase 6 / OTP-027 |
+| Current-value checking | Not in core 0.1 | Separate later opt-in design |
+| CLI and snapshots | Not in 0.1 | After schema and comparison gates |
+| Pydantic integration | No core dependency | Optional post-1.0 |
 
-## Phase 1 — Minimal usable core
+No row implies support for other generic origins, overloads, nested Protocol annotations, Self, ParamSpec, TypeVarTuple, Unpack, or typed kwargs. Unsupported requirement definitions fail compilation; unsupported candidates yield non-permissible unknown evidence.
 
-Target: first installable package suitable for dynamic-boundary validation.
+## Phase 0 — Prove the public boundary
 
-Primary experience:
+Reproduce TypeForm constructor inference, exact return types, structural composition, negative diagnostics, and wheel/sdist behavior in pinned checker environments. Freeze evidence, annotation evaluation, storage, mutation, and failure policies. Establish the CPython matrix before advertising any supported interpreter.
 
-```python
-plugin = PluginInterface.validate(load_plugin(...))
-result = PluginInterface.check(plugin)
-```
+Interface shorthand research may proceed independently; it cannot delay the usable Contract API or weaken its typing guarantees.
 
-Deliverables include `Interface`, `Contract`, method-first validation/checking, immutable contract IR, structured `ContractError`, definition-error handling, callable/member validation, annotation resolution, inheritance, caching, tests, checker fixtures, examples, and an explicit Python support matrix.
+## Phase 1 — Minimal usable core / 0.1
 
-Gate: no advertised feature without positive, negative, error, checker, and version tests.
+Deliver exactly the 0.1 matrix: Contract, compiler/IR, static member discovery with an explicit inspection policy, call-shape and finite type relations, evidence/errors, snapshot reuse, and examples.
 
-## Phase 2 — Typing correctness expansion
+Every advertised feature needs positive, negative, unknown/definition-error, relevant checker, and Python-version tests. “Unknown” is a documented limitation, not completed support for that feature.
 
-Broaden support for ordinary modern Python typing: unions, `Literal`, `Annotated`, aliases, forward references, nested protocols, collection variance, class/static methods, writable properties, descriptors, dynamic members, class-versus-instance policy, and decorator/signature recovery.
+Delivery within Phase 1 follows complete user tasks: first a narrow but working validation/diagnostic path, then call-shape and type expansion, then supported storage and operational hardening. These internal slices do not change the supported 0.1 matrix or imply partial features are releasable.
 
-Gate: conformance corpus demonstrates intentional parity with the typing specification and documents checker differences.
+Public beta additionally requires the experience exercise in EXPERIENCE_DESIGN.md. Its task-completion targets must be measured on the installed package; passing static probes is insufficient.
 
-## Phase 3 — Generics
+## Phase 2 — Ordinary typing and member expansion
 
-Implement correct generic specialization: `TypeVar` resolution, bounds/constraints, variance, inferred variance where applicable, inherited generics, and generic return relationships.
+Add nested Protocol relations, newer aliases, class/static binding, selected descriptors and decorators, and richer storage handling only with explicit conformance and inspection policies. Distinguish runtime value checking from declaration compatibility.
 
-Do not silently erase unsupported generic semantics.
+## Phase 3 — User generics
 
-## Phase 4 — Advanced callable typing
+Specialize TypeVars consistently across all members. Add bounds, constraints, inheritance, explicit/inferred variance, and coherent recursive substitution. Builtin collection support from 0.1 does not count as this phase being complete.
 
-Add overload sets, `ParamSpec`, `Concatenate`, complex `Callable`, `Self`, `TypeVarTuple`, `Unpack`, typed `**kwargs`, and richer async/generator semantics where justified by the typing specification and runtime evidence.
+## Phase 4 — Advanced callable forms
 
-## Phase 5 — Contract schema and tooling
+Overloads, ParamSpec, Concatenate, Self, TypeVarTuple, Unpack, typed kwargs, generators, and richer awaitable relations each require independent specification-driven gates. They are not mandatory for 1.0 unless advertised.
 
-Stabilize a versioned Stipulate contract schema and build serialization, fingerprints, snapshots, CLI inspection, documentation helpers, and plugin/framework examples on top of the canonical contract IR.
+## Phase 5 — Versioned schema
 
-## Phase 6 — Interface evolution
+Specify canonical identity, portability, ignored metadata, defaults, recursion, and schema compatibility. Only then expose schema() and fingerprint(). Do not stabilize an accidental dictionary format through examples.
 
-Expose semantic evolution through the method-first API:
+## Phase 6 — Evolution and CI
 
-```python
-report = ApiV1.compare(ApiV2)
-```
+Expose compare() with separate implementer/consumer results, three-valued breaking status, and fail-closed CI policy for unknowns. Reuse the engine with explicit universal-guarantee context rather than treating gradual acceptance as proof.
 
-Distinguish implementer and consumer compatibility using the same assignability engine as runtime validation. Add semantic change reports and, once trustworthy, snapshot/CI compatibility checks.
-
-Do not build a second independent diff algorithm.
+Snapshots and optional Typer/Rich tooling follow stable schema and comparison semantics.
 
 ## Phase 7 — 1.0 hardening
 
-Before 1.0 require a stable public API, explicit Python matrix, stable error-code policy, schema versioning policy where public, comprehensive typing conformance tests, performance benchmarks, property/fuzz tests, clear unsupported-type behavior, and mature documentation/migration policy.
+Require a stable advertised API/subset, Python and checker matrix, diagnostic/schema compatibility policy, specification corpus, property tests, cache lifecycle/concurrency tests, benchmarks, and mature examples. Unsupported advanced features stay explicitly unsupported; 1.0 does not mean implementing all Python typing.
 
-## Post-1.0 integration track — Pydantic
+## Post-1.0
 
-Pydantic integration is intentionally **optional and post-1.0**. See [PYDANTIC_INTEGRATION.md](PYDANTIC_INTEGRATION.md).
-
-Core principle:
-
-> Stipulate owns structural contracts. Pydantic may enhance value validation and serialization where those concerns naturally intersect.
-
-Potential work:
-
-- first-class examples using Pydantic models in Stipulate interface signatures;
-- optional current attribute/property value validation through Pydantic `TypeAdapter`;
-- optional Pydantic representations/export helpers for compatibility results, evidence, reports, and schema data;
-- FastAPI examples where Pydantic validates request/response data and Stipulate validates dynamically loaded or injected service implementations;
-- optional tooling models for consuming Stipulate reports as application data.
-
-Packaging should use an optional extra such as:
-
-```text
-stipulate[pydantic]
-```
-
-Pydantic must not become a core dependency, change Stipulate compatibility semantics, or become the callable/interface assignability engine.
-
-## Other post-1.0 possibilities
-
-These are intentionally not commitments:
-
-- optional enforcement proxies;
-- class-level preflight validation for plugin registration;
-- framework adapters;
-- richer IDE/checker integration;
-- generated test doubles;
-- validation hooks for dependency injection containers;
-- capability-set tooling;
-- optional optimized/Rust core if profiling demonstrates a meaningful need.
-
-## Guiding rule
-
-Stipulate should expand by making Python contract semantics more correct and extracting tooling value from the same trustworthy contract model. Integrations should sit on top of that core rather than reshape it.
+Pydantic value/report integration is optional. Proxies, framework adapters, generated test doubles, and a native core remain possibilities requiring demonstrated need. Integration work must not alter core compatibility results.

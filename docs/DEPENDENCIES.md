@@ -1,141 +1,35 @@
 # Dependency Strategy
 
-## Principle
+## Core
 
-Stipulate should keep its core dependency surface small. Dependencies may reduce implementation risk and improve user experience, but Stipulate must own its contract IR, assignability semantics, evidence model, and compatibility engine.
+Start with standard-library dataclasses, inspect, typing, weakref, and explicit typed internal records. Stipulate owns its IR, type relations, evidence, and enforcement semantics.
 
-## Core candidates
+Use typing_extensions for TypeForm and supported cross-version features. The recorded design probes use 4.15.0; treat that as the initial tested baseline, not proof of the oldest compatible release. Freeze actual package minimums only after the release matrix passes.
 
-### `typing-extensions`
+attrs and typing-inspection remain optional implementation evaluations, not commitments. Adopt them only if conformance experiments demonstrate a meaningful correctness or maintenance benefit. Do not add a dependency because it resembles a small standard-library abstraction.
 
-Preferred core dependency when needed to provide consistent modern typing features across supported Python versions.
+## Development
 
-### `attrs`
+Use pytest, Hypothesis, Ruff, Pyright strict, and mypy public fixtures. Pin tested checker versions and document required TypeForm settings. The specification is the semantic reference; checker/runtime-library disagreement needs an explanation rather than majority voting.
 
-Evaluate before adoption for immutable/slotted internal models such as `Contract`, `Evidence`, and compatibility results. Standard-library dataclasses remain a valid alternative. Do not add `attrs` merely for convenience if it does not materially simplify the implementation.
+Keep design probes separate from implementation tests. A local fixture dependency is not automatically a production dependency.
 
-### `typing-inspection`
+## Later CLI
 
-Evaluate experimentally for runtime annotation inspection/normalization. Do not make it foundational until its behavior has been tested against Stipulate's typing conformance corpus and support matrix.
+Typer and Rich are preferred candidates for an optional stipulate[cli] extra once snapshot and comparison APIs are ready. CLI code consumes the shared contract engine and emits machine-readable reports independently of terminal rendering.
 
-## CLI
-
-### Typer
-
-Typer is the preferred CLI framework for Stipulate.
-
-Reasons:
-
-- mature and familiar in the Python ecosystem;
-- type-hint-oriented command definitions;
-- strong documentation and adoption;
-- natural fit for Stipulate's small command vocabulary;
-- integrates well with Rich for readable terminal output.
-
-Typer should remain optional so library-only users do not need CLI dependencies.
-
-Proposed packaging:
-
-```text
-pip install "stipulate[cli]"
-```
-
-Potential CLI surface:
-
-```text
-stipulate check
-stipulate snapshot
-stipulate diff
-```
-
-The CLI must consume the same `Contract` and compatibility engine used by the Python API. It must not implement independent compatibility rules.
-
-### Rich
-
-Rich is the preferred companion for human-readable CLI reports if/when the CLI ships.
-
-Use it for semantic compatibility reports, tables, summaries, and CI-friendly terminal output. Keep structured machine-readable output independent from Rich.
+No CLI dependency is needed for library validation or the 0.1 API.
 
 ## Optional integrations
 
-### Pydantic
+Pydantic is optional and post-1.0. It must not become the assignability engine or change core outcomes based on installation state. Integration value validation needs its own no-hidden-coercion and attribute-access policy.
 
-Post-1.0 optional integration only. See `PYDANTIC_INTEGRATION.md`.
+Griffe may be evaluated if later work needs package API extraction. Typeguard and other runtime typing libraries can inform narrow differential experiments but do not define Stipulate's structural assignability semantics.
 
-Suggested extra:
+## Optimization
 
-```text
-stipulate[pydantic]
-```
+Use hashlib and json for future schema tooling once canonical semantics exist. Do not introduce Rust, PyO3, or native build infrastructure before profiling identifies a material bottleneck. Keep Python introspection on the Python side of any future native boundary.
 
-Pydantic must not become a core dependency or assignability engine.
+## Acceptance rule
 
-### Griffe
-
-Do not add as a core dependency. It may be evaluated later if Stipulate gains a concrete need for whole-package/static API extraction that cannot be justified in the explicit-contract core.
-
-## Development and conformance dependencies
-
-### pytest
-
-Primary test runner.
-
-### Hypothesis
-
-Strongly recommended for property-based testing of callable normalization, assignability relations, contract transformations, and evolution invariants.
-
-### mypy and Pyright
-
-Required conformance tools for the public structural-typing experience. Checker fixtures should be part of CI.
-
-### Typeguard / Beartype
-
-Useful as research/reference systems and possibly differential-test inputs for narrow runtime typing cases, but not runtime dependencies or semantic authorities.
-
-## Standard library first
-
-Prefer the standard library for functionality that does not justify another dependency:
-
-- `inspect` for runtime inspection;
-- `typing` for standard typing primitives;
-- `weakref` and `functools` for initial caching;
-- `hashlib` for fingerprints;
-- `json` for canonical serialization where sufficient;
-- `dataclasses` unless `attrs` demonstrates a material advantage.
-
-## Native/Rust core
-
-Do not add a Rust/native dependency before profiling demonstrates a meaningful need. Design canonical Contract IR so a future PyO3/maturin core remains possible without moving Python introspection into Rust.
-
-## Dependency acceptance rule
-
-A new runtime dependency should satisfy at least one of these conditions:
-
-1. removes a substantial amount of difficult non-differentiating code;
-2. materially improves correctness or cross-version compatibility;
-3. provides a mature user-facing capability that would be wasteful to rebuild;
-4. is optional and unlocks a clearly valuable integration.
-
-Do not add dependencies merely because they provide abstractions similar to code Stipulate can implement simply with the standard library.
-
-## Current preferred posture
-
-```text
-Core
-  typing-extensions
-  attrs?                evaluate
-  typing-inspection?    evaluate
-
-CLI extra
-  typer
-  rich
-
-Post-1.0 integration
-  pydantic
-
-Dev / conformance
-  pytest
-  hypothesis
-  mypy
-  pyright
-```
+A dependency must demonstrably remove difficult non-differentiating work, improve tested compatibility, or provide a justified optional capability. Record its purpose, supported versions, typing quality, and effect on the package matrix before adoption.

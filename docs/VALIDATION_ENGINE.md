@@ -1,147 +1,64 @@
 # Validation Engine
 
-## Objective
-
-The validation engine determines whether a candidate object satisfies a compiled Stipulate interface and returns the original object on success.
-
-```python
-validated = validate(MyInterface, candidate)
-assert validated is candidate
-```
-
 ## Pipeline
 
-```text
-interface class
-    -> compile / cache lookup
-    -> candidate inspection
-    -> per-member validation
-    -> error aggregation
-    -> success or InterfaceValidationError
-```
+`Contract(ProtocolType)` compiles a requirement snapshot. `contract.check(candidate)` statically inspects the candidate and returns a policy-independent result. `contract.validate(candidate, strict=True)` checks, enforces the acceptance table, and returns the original candidate on success.
 
-## Compilation
+Compilation errors use `ContractDefinitionError`; rejection under enforcement uses `ContractError`. See CONTRACT_ENGINE.md for exact outcomes.
 
-Compilation should occur before candidate validation and should normalize interface metadata into an immutable `CompiledInterface`.
+## Annotation policies
 
-Compilation responsibilities include:
+Default `annotations="trusted"` resolves annotations with controlled namespaces and the standard runtime facilities appropriate to the supported Python version. Request include_extras where appropriate to preserve Annotated metadata. Annotation expressions and deferred evaluation functions can execute Python code. Loading a plugin already executes code; Stipulate is not a sandbox or a guarantee that introspection has no effects.
 
-- resolving type hints;
-- collecting inherited members;
-- identifying member kinds;
-- normalizing method signatures;
-- identifying async functions;
-- preserving source annotations for diagnostics;
-- preparing assignability metadata;
-- detecting unsupported or contradictory declarations.
+`annotations="raw"` does not request evaluation of strings, forward references, or deferred annotation functions. It uses only metadata that can be obtained without that evaluation. Unresolved required types cause definition errors; unresolved candidate types become `annotation_unresolved` unknowns. Do not claim this mode makes arbitrary object introspection secure or undoes evaluation already performed by Python.
 
-## Candidate inspection
+No attempt should automatically import TYPE_CHECKING-only names. Advanced `globalns` and `localns` mappings apply to the requirement declaration only. Candidate annotations use their own defining module and owner context; never resolve them against the requirement namespace merely because names match. Unavailable candidate-local names remain unknown. The constructor mappings are copied for stable key/value bindings (referenced objects are not deep-frozen). Custom namespaces bypass the shared global compilation cache in 0.1. Document that annotation resolution can fail for unavailable function-local names.
 
-Inspection should be conservative about side effects.
+## Static member inspection
 
-Prefer static inspection such as `inspect.getattr_static` when identifying member presence and descriptor kind. Avoid invoking properties or arbitrary descriptors just to discover whether a member exists.
+Use static lookup to determine declaration presence, member kind, and supported storage. Do not call candidate methods, property getters, custom descriptor accessors, or dynamic __getattr__ hooks to gather evidence. Do not claim static inspection establishes how a custom __getattribute__ implementation will behave.
 
-Runtime-value validation, if enabled, may require ordinary attribute access and therefore must be documented as potentially invoking descriptors.
+Plain Python methods with standard binding and supported attributes/properties form the initial supported subset. Unknown custom lookup/binding behavior produces `dynamic_member_unverifiable` or `descriptor_unverifiable` rather than a fabricated missing member or compatible declaration. Conservatively handle custom attribute dispatch that can intercept required members.
 
-## Method validation
+Extra candidate members are allowed and do not enter the required-member analysis. Class-object candidates are outside 0.1 instance validation: report an explicit unsupported-candidate outcome rather than inferring instances, invoking constructors, or applying incorrect binding.
 
-For each required method:
+## Methods
 
-1. Verify the member exists.
-2. Verify that it is callable in the expected binding context.
-3. Normalize the implementation signature.
-4. Compare call-shape compatibility.
-5. Validate parameter type assignability.
-6. Validate return type assignability.
-7. Validate sync/async compatibility.
+1. Establish member presence and supported binding.
+2. Recover the externally exposed signature using the precedence below.
+3. Check containment of all legal required calls.
+4. Compare parameter and return declarations directionally.
+5. Check supported execution kind.
+6. Aggregate independent evidence in deterministic order.
 
-Do not stop after the first parameter mismatch. Collect independent member errors where practical.
+If presence fails, report that root cause and record dependent obligations as unassessed rather than emitting misleading parameter errors.
 
-## Attribute validation
+## Signature precedence
 
-For declared attributes, the engine should distinguish declaration validation from current-value validation.
+Use an explicit __signature__ when well-formed; otherwise follow a well-formed __wrapped__ chain as inspect.signature does; otherwise inspect the visible Python callable. Bound-method normalization must happen exactly once. Preserve the metadata source in evidence and detect wrapper cycles and malformed overrides.
 
-Initial behavior should support current instance value validation where a safe runtime type check is meaningful, but must avoid claiming that a matching current value proves a writable attribute has the correct long-term contract.
+The exposed signature is a trusted declaration; wraps does not prove a wrapper preserves behavior. Unavailable, malformed, or unsupported signatures yield non-permissible unknown evidence. Do not execute representative calls to recover a signature.
 
-## Property validation
+## Attributes and properties
 
-A property should be inspected as a descriptor and its getter return annotation validated.
+Support statically declared plain instance/class storage and standard property descriptors for the documented cases. For an instance-required attribute, a class annotation alone does not establish initialized storage. Verify supported storage presence without reading through user descriptors. Uninitialized slots require explicit handling; if presence cannot be established without executing a descriptor, report uncertainty.
 
-Writable property support should eventually validate setter compatibility separately.
+Use declared read/write types. A property getter's return annotation establishes its declared read type; a setter parameter establishes its declared write type. A current value is not a declaration and is not checked for recursive value conformance in 0.1.
 
-## Dynamic members
+Properties are never invoked to see whether they return the annotated value. Dynamic attributes, custom descriptors, cached_property, and generated framework storage remain unsupported unless a later explicit handler passes its gates.
 
-Objects may provide members through `__getattr__` or `__getattribute__`.
+## Async policy
 
-Recommended policy:
+0.1 distinguishes ordinary Python def and coroutine async def. An async declaration requires a coroutine implementation declaration. A synchronous function annotated as returning Awaitable is not automatically accepted. Conversely, an unexpected coroutine declaration fails a required ordinary def policy.
 
-- permissive mode may allow a dynamic member to satisfy existence when it can be accessed;
-- strict mode should require inspectable contract information when signature/type compatibility cannot otherwise be proven;
-- diagnostics should explain that the member is dynamic rather than silently treating it as an ordinary declaration.
+This is an intentional execution-kind policy in addition to typing assignability; it is stricter than some callable substitutions allowed by static typing. Normalize coroutine result annotations consistently and do not wrap them twice.
 
-## Decorators and wrapped functions
+Async generators, generators, callable objects, and unusual decorator-induced execution kinds remain unsupported until their own normalization rules pass tests. Class and static methods are outside the 0.1 subset.
 
-Use `inspect.unwrap` where appropriate so well-behaved decorators using `functools.wraps` preserve the underlying contract.
+## Failure handling
 
-If a wrapper intentionally changes the public signature, the exposed signature should win.
+Known candidate mismatches become incompatible findings. Expected inspection limitations become unknown findings with reason and provenance. Requirement failures raise definition errors. Catch only documented inspection/resolution failures at their boundary; never turn arbitrary internal bugs, KeyboardInterrupt, or SystemExit into compatibility evidence.
 
-## Async validation
+## Value validation
 
-The initial implementation should distinguish ordinary `def` and `async def` directly.
-
-Do not automatically equate:
-
-```python
-async def f() -> T
-```
-
-with:
-
-```python
-def f() -> Awaitable[T]
-```
-
-until a deliberate semantic rule is designed and tested.
-
-Future support should separately address:
-
-- generators;
-- async generators;
-- context managers;
-- async context managers.
-
-## Configuration
-
-A small initial config surface is preferable.
-
-Conceptual options:
-
-```python
-InterfaceConfig(
-    strict=False,
-    validate_values=True,
-)
-```
-
-Avoid adding many policy switches before real use cases demonstrate the need.
-
-## Adapters
-
-`InterfaceAdapter` should compile once and validate many candidates:
-
-```python
-adapter = InterfaceAdapter(Storage)
-
-adapter.validate_python(local_storage)
-adapter.validate_python(s3_storage)
-```
-
-This should be the preferred form for high-throughput or framework usage.
-
-## Failure policy
-
-Validation should fail closed when a requested strict guarantee cannot be proven.
-
-Unsupported typing constructs must not silently become equality checks or unconditional acceptance.
-
-Permissive behavior should be explicit and narrowly defined.
+Current-value validation is not enabled in core 0.1. A later explicit operation may execute attribute access and validate values, with a separately named policy and result. Optional Pydantic integration must not coerce and discard a replacement value while returning an unchanged, invalid candidate as “validated.”

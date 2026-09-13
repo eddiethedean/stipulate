@@ -1,164 +1,84 @@
 # Static Typing Strategy
 
-## Goal
+## Permanent baseline
 
-Stipulate is **Pyright strict from the beginning and permanently forward**.
+All first-party implementation code and promoted valid examples must pass Pyright strict with zero errors. Runtime introspection is normalized behind small typed boundaries. No blanket Any, disabled diagnostics, or file-wide ignores are accepted to make the public API appear typed.
 
-A package centered on Python interface contracts should hold itself to a high internal typing standard. Strict typing is therefore a project invariant, not a cleanup phase or pre-release hardening task.
+Mypy is a required public interoperability target. Record its supported versions and any feature settings separately from Pyright. Both checkers must preserve the interface type returned by the advertised validation API.
 
-## Required checker mode
+## Typed Contract constructor
 
-The repository must configure Pyright with:
-
-```json
-{
-  "typeCheckingMode": "strict"
-}
-```
-
-Equivalent `pyproject.toml` configuration is acceptable if it produces the same behavior.
-
-All first-party source code must pass Pyright strict with zero errors before merge.
-
-## Scope
-
-Strict checking applies to:
-
-- `src/stipulate/`;
-- public API modules;
-- internal implementation modules;
-- CLI code;
-- optional integration packages when installed in their supported environments;
-- typing fixtures intended to demonstrate valid usage;
-- documentation examples that are promoted as type-safe examples.
-
-Tests may use narrowly justified exceptions where test construction requires intentionally invalid typing, but suppressions must be local and documented.
-
-## No warning-debt policy
-
-Do not accumulate typing debt for later cleanup.
-
-New code must not introduce broad suppressions such as file-wide `# pyright: ignore`, blanket `Any`, or disabled strict diagnostics merely to unblock implementation.
-
-When dynamic Python behavior genuinely cannot be represented precisely, isolate it behind a small typed boundary and document the reason.
-
-## Suppression policy
-
-A suppression is acceptable only when all of the following are true:
-
-1. the behavior is intentional;
-2. the checker cannot currently express it correctly;
-3. the suppression is as narrow as practical;
-4. a comment explains the limitation when it is non-obvious;
-5. the surrounding public API remains precisely typed.
-
-Typing workarounds for the `Interface` runtime bridge should be centralized rather than repeated across the codebase.
-
-## Desired declaration
+The planned public signature uses a type-form parameter, not a constructible-class parameter:
 
 ```python
-from stipulate import Interface
+from typing import Generic, TypeVar
+from typing_extensions import TypeForm
 
+T = TypeVar("T")
 
-class Repository(Interface):
-    def get(self, id: int) -> User | None: ...
+class Contract(Generic[T]):
+    def __init__(self, declaration: TypeForm[T], ...) -> None: ...
+    def validate(self, candidate: object, *, strict: bool = True) -> T: ...
 ```
 
-Ordinary implementations should satisfy it structurally:
+This is a signature sketch, not executable implementation code. TypeForm expresses the input/output type relationship without implying that the supplied Protocol can be instantiated. Runtime compilation still restricts inputs to the supported Protocol subset.
+
+Users write `storage_contract = Contract(Storage)`; checkers should infer `Contract[Storage]`, and `.validate(candidate)` should return Storage. The constructor must not degrade to an unrelated object parameter with caller-selected T: that would allow `Contract[int](Storage)` to claim an unrelated return type.
+
+## Verified design evidence
+
+The fixtures in ../design_probes/ exercise the proposed signature, structural composition, exact return inference, incompatible explicit type arguments, and negative implementations. They are static declaration probes, not a working validator.
+
+On the recorded local environment, Pyright 1.1.411 and mypy 1.19.1 pass the positive TypeForm probe. Mypy 1.19.1 requires `--enable-incomplete-feature=TypeForm`; this is a checker feature flag, not a plugin. The recorded typing_extensions version is 4.15.0.
+
+These are tested versions, not claimed minimum versions. Release CI must pin and prove its checker matrix. If the flag remains necessary at release, put the exact setting in setup documentation. Do not silently replace TypeForm with Any to support older checkers. Evaluate later checker versions before freezing 0.1 requirements.
+
+## Rejected fallback
 
 ```python
-class PostgresRepository:
-    def get(self, id: int) -> User | None:
-        ...
-
-
-def use(repo: Repository) -> None:
-    ...
-
-
-use(PostgresRepository())
+def validate(interface: type[T], candidate: object) -> T: ...
 ```
 
-## Interface bridge
+Passing a Protocol class to this generic signature is accepted in the tested Pyright configuration but rejected by the tested mypy with `type-abstract`. It is not a checker-neutral fallback. The declaration probe preserves this disagreement as expected evidence.
 
-Python's typing specification treats `Protocol` specially. A normal subclass of a protocol is not automatically structural unless the special Protocol form participates in the declaration.
+## Structural composition
 
-The prototype therefore uses a typing-facing `Interface` representation compatible with `Protocol` and a runtime representation that injects Stipulate machinery through `__mro_entries__`.
-
-This mechanism must itself be proven under Pyright strict across every supported Python version.
-
-## Method-first API challenge
-
-The desired public API is:
+Use an explicit special Protocol base:
 
 ```python
-Repository.validate(candidate)
-Repository.check(candidate)
-Repository.compare(RepositoryV2)
-Repository.schema()
-Repository.fingerprint()
-Repository.contract
+class Storage(Readable, Writable, Protocol):
+    pass
 ```
 
-Current Python typing has a known limitation around simultaneously representing `Interface` as the special Protocol base and exposing Stipulate metaclass methods to the checker.
+Omitting Protocol creates an ordinary class for static analysis. Runtime metaclass changes cannot repair that interpretation. Positive and negative fixtures must cover single inheritance, multiple inheritance, overrides, and structural implementations with no nominal relationship.
 
-This is a first-class technical problem. The project should not silently waive strict checking around the public API.
+## Experimental Interface bridge
 
-Any accepted solution must either:
+The desired `class Foo(Interface):` plus `Foo.validate()` is separately gated. A typing-facing import re-export of Protocol can support the initial declaration but does not automatically describe custom metaclass methods. An assignment alias is not equivalent across checkers. A standard class containing helper methods risks contaminating protocol requirements.
 
-- make the method-first API pass Pyright strict directly; or
-- provide a narrowly scoped, clearly documented typing representation/stub strategy while preserving the same runtime API.
+Promotion requires all of:
 
-A free-function fallback may exist only if required by current typing limitations and should remain secondary to the intended API.
+- valid and invalid structural assignments under both checkers;
+- precise class-side return inference without Any leakage;
+- runtime member discovery excludes every framework helper;
+- explicit structural extension/composition works statically and at runtime;
+- normal module, installed wheel, and installed sdist usage works;
+- no consumer ignores, generated per-interface stubs, or required checker plugins;
+- each advertised Python version passes runtime and checker fixtures.
 
-## Existing Protocols
+Keep the bridge experimental if any requirement remains unresolved. Contract(Protocol) remains the released method-based path; unresolved shorthand does not block 0.1.
 
-```python
-from stipulate import Contract
+## Packaging
 
-Storage = Contract(StorageProtocol)
-```
+Ship py.typed and complete public type information. Private typing implementation classes must not appear in public annotations. If stubs are used, check their agreement with the runtime and test an installed distribution outside the source tree. A clean in-repository checker run alone is insufficient.
 
-The `Contract` API must be fully typed under Pyright strict, including return types for `validate()`, `check()`, `compare()`, schema access, and fingerprints.
+TypeForm requires typing_extensions on supported older interpreters; dependency minimums must be derived from the tested release matrix. Static acceptance of broader type forms does not imply runtime support for non-Protocol declarations.
 
-## Checker matrix
+## Suppressions
 
-Pyright strict is the primary mandatory checker.
+Narrow suppressions require a documented genuine checker limitation and a precisely typed surrounding API. Intentionally invalid fixtures assert expected diagnostic codes instead of suppressing them. A fixture that merely reveals the desired type while also producing errors is not a passing example.
 
-CI must run it on every supported Python/package configuration where feasible.
+## Sources
 
-Mypy remains an important interoperability target and should have conformance fixtures, but passing mypy must not weaken the Pyright strict baseline.
-
-## Public typing guarantees
-
-Public APIs should avoid leaking `Any` unless the underlying typing semantics genuinely require it.
-
-Generic APIs should preserve types precisely. For example, validating against a contract should return the interface/contract type rather than `object` or `Any` wherever Python typing can express that relationship.
-
-## Stub policy
-
-Ship complete type information with the package. If `.pyi` files are required to represent runtime metaclass tricks safely, they are part of the public API and must themselves pass the checker suite.
-
-Never expose private CPython typing implementation classes such as `_ProtocolMeta` in public annotations.
-
-## Strictness and dynamic internals
-
-Runtime introspection inevitably touches dynamic objects. The implementation should convert dynamic/unknown data into normalized typed internal structures as early as practical.
-
-Prefer:
-
-```text
-untyped/dynamic Python boundary
-        ↓
-small normalization layer
-        ↓
-strictly typed Contract IR and compatibility engine
-```
-
-rather than spreading `Any` throughout the engine.
-
-## CI rule
-
-A change that fails Pyright strict is not merge-ready.
-
-Strict typing remains required for all future releases, refactors, integrations, and performance rewrites, including any future Rust/PyO3 boundary on the Python side.
+- [TypeForm specification](https://typing.python.org/en/latest/spec/type-forms.html)
+- [Protocol composition and class-object rules](https://typing.python.org/en/latest/spec/protocol.html)

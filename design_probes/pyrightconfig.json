@@ -1,0 +1,11 @@
+{
+  "typeCheckingMode": "strict",
+  "pythonVersion": "3.11",
+  "include": [
+    "contract_api.pyi",
+    "positive.py",
+    "runtime_assumptions.py",
+    "legacy_type_parameter.py",
+    "contract_api.py"
+  ]
+}

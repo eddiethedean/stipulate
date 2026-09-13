@@ -1,258 +1,100 @@
 # Contract Engine
 
-## Purpose
+## Semantic center
 
-Stipulate is designed as a contract engine for Python structural interfaces. Runtime validation is the first application of the engine, not the architectural primitive.
+The engine compares provided declarations against required declarations. Compatibility means each supported required operation is available with compatible call shape, binding, and types, assuming declarations describe actual behavior.
 
-The semantic center is a directional relation:
+One normalization and relation engine powers candidate checks and eventual evolution analysis. Relation context is explicit: metadata conformance and universal contract evolution have different obligations when gradual or unknown types are involved.
 
-```text
-provided contract <= required contract
-```
+## Layers
 
-meaning that the provided side can safely be used where the required side is expected.
+1. Compile a supported Protocol into immutable `ContractIR`.
+2. Inspect a candidate into an ephemeral provided-contract view.
+3. Compare capabilities and types, producing evidence.
+4. Aggregate a policy-independent `CompatibilityResult`.
+5. Enforce strict or permissive acceptance and return the original candidate or raise `ContractError`.
 
-## Five core operations
-
-### Compile
-
-```python
-contract = compile_contract(Storage)
-```
-
-Convert a Python `Interface` or supported `Protocol` into immutable canonical semantic metadata.
-
-### Inspect
-
-```python
-result = inspect_contract(Storage, candidate)
-```
-
-Compile the requirement, inspect the candidate, and return a non-throwing `CompatibilityResult` containing evidence.
-
-### Enforce
-
-```python
-storage = validate(Storage, candidate)
-```
-
-Interpret a compatibility result according to validation policy. Successful validation returns the original object. Incompatibility, and unknown evidence under strict policy, raises `InterfaceValidationError`.
-
-### Compare
-
-```python
-report = compare_interfaces(StorageV1, StorageV2)
-```
-
-Compare two explicit contracts directionally. Evolution analysis must distinguish compatibility for existing implementers from compatibility for existing consumers rather than flattening all changes into one textual diff.
-
-### Serialize
-
-```python
-schema = contract.schema()
-fingerprint = contract.fingerprint()
-```
-
-Produce a canonical versioned representation suitable for schemas, snapshots, hashing, CI, documentation, and future interoperability.
+Later serialization and comparison consume the same IR and relation rules. They are not public 0.1 operations.
 
 ## Contract IR
 
-The compiled representation should be semantic and deliberately smaller than a Python source/API AST.
-
-Conceptually:
-
 ```text
-Contract
-  identity/display metadata
+ContractIR
+  declaration identity and diagnostic provenance
   members
-    MethodContract
-      callable shape
-      async/generator semantics
-      normalized TypeExpr parameters
-      normalized TypeExpr return
-    AttributeContract
-      read type
-      write type if applicable
-    PropertyContract
-      read/write capabilities
-  generic bindings/parameters
-  schema version
+    MethodContract: binding, legal calls, parameter types, return type, execution kind
+    AttributeContract: read type, write type, storage capability
+    PropertyContract: getter, optional setter
+  normalized TypeExpr graph
+  compilation policy and supported feature set
 ```
 
-The IR must not contain candidate-specific validation state.
+Candidate evidence and enforcement policy do not enter the requirement IR. Public `Contract[T]` is a typed facade holding one snapshot. Keep source provenance outside the semantic fields used for future serialization.
 
-## CompatibilityResult
+Recursive references use explicit graph identities and a cycle-aware relation context. A cache of visited pairs must distinguish pending from established relations; recursion is not unconditional compatibility. Unsupported recursive forms remain explicit until dedicated support lands.
 
-All compatibility analysis should converge on a common immutable result model.
+## Evidence and aggregation
 
-Conceptually:
+Evidence has `PROVEN`, `INCOMPATIBLE`, or `UNKNOWN` status, a stable code and location, expected/actual metadata, provenance, and an optional actionable hint. PROVEN means an obligation about declarations was established, not that a method body was executed.
 
-```python
-CompatibilityResult(
-    status=CompatibilityStatus.COMPATIBLE,
-    assurance=Assurance.COMPLETE,
-    evidence=(...),
-)
-```
+Conjunctive requirements aggregate as follows:
 
-The result should support at least three semantic outcomes:
+| Findings | Result status | Truthiness | Strict acceptance | Permissive acceptance |
+| --- | --- | --- | --- | --- |
+| All obligations established | COMPATIBLE | True | Yes | Yes |
+| At least one incompatible finding, with or without unknowns | INCOMPATIBLE | False | No | No |
+| No incompatibility; unknowns only from the allowlist below | UNKNOWN | False | No | Yes |
+| No incompatibility; any other unknown reason | UNKNOWN | False | No | No |
 
-- `COMPATIBLE`: no incompatible evidence exists and policy-required facts are established;
-- `INCOMPATIBLE`: at least one contract requirement is disproven;
-- `UNKNOWN`: compatibility cannot be proven or disproven from available metadata.
+`complete` means every applicable obligation was decided. It is independent of success: a fully analyzed incompatible object is complete. Blocked dependent obligations must remain explicitly unassessed; do not manufacture completeness by dropping them. An empty valid contract is compatible and complete.
 
-Do not collapse unknown evidence into success internally. Permissive validation may choose to tolerate unknown evidence as policy, but the underlying result must preserve it.
+Disjunctive type relations use three-valued logic: one established branch suffices for an OR, all disproven branches disprove it, otherwise it is unknown. An AND is disproven by any failed obligation, established only when all succeed, otherwise unknown. Apply this inside union and other relation algorithms before aggregating independent member requirements.
 
-## Evidence
+There is no second public assurance enum or confidence score in 0.1. `status`, `complete`, and detailed evidence suffice.
 
-Evidence is the explanation layer of the engine, not merely an error-message implementation detail.
+## Enforcement policy
 
-An evidence record should contain enough structured information for human rendering, validation errors, CI, and tooling:
+`validate(candidate, strict=True)` and `result.accepted(strict=True)` share the exact same acceptance function. `check()` never applies enforcement policy.
 
-```python
-Evidence(
-    loc=("get", "key"),
-    status=EvidenceStatus.PROVEN,
-    code="parameter_assignable",
-    expected=str,
-    actual=str,
-    source="annotation",
-)
-```
+Permissive acceptance may tolerate only candidate type unknowns with codes `annotation_missing` and `gradual_type`. Known member presence, binding, signature, and execution-kind checks must still pass. Missing required members, unsupported types, unresolved expressions, unavailable signatures, dynamic members, and inspection failures cannot be waived by `strict=False`.
 
-Unknown evidence should explain why proof is unavailable:
+Unknowns retain their original status and provenance after acceptance. A permissive return type is a documented trust boundary comparable to adopting untyped code, not a complete metadata proof. Invalid requirements always raise `ContractDefinitionError` independently of enforcement policy.
 
-```python
-Evidence(
-    loc=("get", "return"),
-    status=EvidenceStatus.UNKNOWN,
-    code="implementation_annotation_missing",
-    expected=bytes,
-)
-```
+## Exceptions
 
-Incompatible evidence should explain the violated semantic relation, not merely print two unequal annotations.
+`ContractError` means a valid contract rejected the candidate under the requested policy. It includes the result and the findings responsible for rejection, including unknowns rejected by strict policy.
 
-## Assurance
+`ContractDefinitionError` means the requirement could not be compiled. `check()` does not swallow definition errors or unexpected internal defects. Expected candidate inspection limitations become unknown evidence; process-control exceptions propagate.
 
-Assurance summarizes how completely Stipulate could establish a result from available runtime metadata.
+## Evolution semantics — later release
 
-Initial conceptual levels:
+For old contract O and new contract N, under fully supported, fully static semantics:
 
-- `COMPLETE`: all relevant requirements were established from supported evidence;
-- `PARTIAL`: some requirements are unknown but none are disproven;
-- `NONE`: insufficient evidence exists for meaningful proof.
+- Implementers: O is assignable to N. Every implementation meeting O also meets N.
+- Consumers: N is assignable to O. A consumer using O's operations can use N.
 
-Exact public enum design remains subject to OTP acceptance tests. Assurance must not be statistical confidence and must not imply observed runtime behavior that Stipulate did not execute.
+| Change from old to new | Existing implementers | Existing consumers |
+| --- | --- | --- |
+| Add a required method | Incompatible | Compatible |
+| Remove a required method | Compatible | Incompatible |
+| Widen accepted parameter from int to object | Incompatible | Compatible |
+| Narrow returned value from object to int | Incompatible | Compatible |
+| Add an optional parameter to an existing method | May be incompatible: old implementations need not accept it | Compatible if old calls and results are preserved |
 
-## Object validation and contract comparison share semantics
+These are independent perspectives, not a single “breaking” direction. Member kinds, mutability, and call shapes remain part of the analysis.
 
-The validator and evolution engine must not implement separate compatibility rules.
+Python gradual assignability involving Any is not a universal substitutability guarantee. For example, returns `int`, `Any`, and `str` permit pairwise gradual assignments through Any without making int assignable to str. Never infer transitive evolution safety through such evidence. Use the same engine with a universal-guarantee context; return UNKNOWN wherever the guarantee depends on unsupported or gradual assumptions. Independent mismatches can still establish incompatibility.
 
-For object validation, candidate introspection creates a provided-contract view and compares it to the required interface contract.
+`report.implementers` and `.consumers` are CompatibilityResults. `report.breaking` is True if either direction is INCOMPATIBLE, False only if both are COMPATIBLE, and None otherwise. `report.complete` requires both directions complete. CI fails on incompatible or unknown required directions by default. Report objects have no implicit truthiness; reject it to avoid ambiguous policy decisions. The CLI can explicitly select which direction matters.
 
-For interface evolution, both sides are explicit contracts.
+## Canonical schema and fingerprints — later release
 
-This shared engine is a core differentiator and correctness requirement.
+Versioned schema work must specify member ordering, unions, aliases, nominal type identity, generic bindings, recursive references, default presence versus default values, ignored Annotated metadata, and portability before publication.
 
-## Directional evolution
+A semantic fingerprint excludes display names, source locations, and irrelevant default values. Callable compatibility depends on default presence; changed default behavior can be reported separately but is not behavioral proof. Preserve nominal identities; never merge unrelated types merely because names match. Process-local or non-portable identities must be rejected for portable snapshots or explicitly marked non-portable, not serialized using unstable repr output.
 
-Given old and new interface contracts, Stipulate should eventually report at least two perspectives.
+Use an explicit format such as `stipulate-contract-v1:sha256:<digest>`. A fingerprint difference does not imply incompatibility. Loading snapshots must not automatically import or execute arbitrary type references.
 
-### Implementer compatibility
+## Native implementation boundary
 
-Will implementations satisfying the old interface necessarily satisfy the new interface?
-
-### Consumer compatibility
-
-Can consumers written against the old interface safely interact with values described by the new contract?
-
-These directions may disagree because callable parameters are contravariant and return values are covariant.
-
-A report should preserve that distinction:
-
-```python
-report.implementer_compatible
-report.consumer_compatible
-```
-
-## Canonical serialization
-
-The canonical schema is Stipulate's semantic interchange representation. It should be deterministic and versioned.
-
-It powers:
-
-- `interface_schema()`;
-- snapshots;
-- fingerprints;
-- compatibility baselines;
-- documentation/tooling;
-- possible future native-core boundaries.
-
-Canonicalization rules must specify member ordering, type normalization, aliases, unions, defaults, qualified names, generic parameters, and schema-version behavior before fingerprints become public compatibility guarantees.
-
-## Fingerprints
-
-A fingerprint should identify a canonical semantic contract, not source formatting.
-
-Conceptually:
-
-```text
-stipulate-contract-v1:sha256:<digest>
-```
-
-Fingerprints are useful for identity, caching, manifests, and baseline checks. They do not themselves establish compatibility: two different fingerprints can still represent mutually compatible contracts.
-
-## Snapshots and CI
-
-A future CLI can serialize explicit contracts as repository baselines:
-
-```text
-stipulate snapshot
-stipulate check
-```
-
-`check` should perform semantic compatibility analysis rather than source/text diffing.
-
-The CLI must remain a consumer of the same contract engine used by the Python API.
-
-## Capability analysis
-
-Structural interfaces naturally represent capabilities. Future tooling may inspect an object against multiple contracts:
-
-```python
-inspect_capabilities(obj, [Readable, Writable, Transactional])
-```
-
-This should remain contract-engine functionality rather than turning Stipulate into a plugin or dependency-injection framework.
-
-## Rust-ready boundary
-
-The initial implementation should remain Python unless benchmarks justify a native core. However, the IR and compatibility engine should avoid depending directly on live `inspect.Parameter`, descriptor, and arbitrary `typing` objects after compilation.
-
-A future architecture could be:
-
-```text
-Python introspection and annotation resolution
-                ↓
-       canonical Contract IR
-                ↓
-        compatibility core
-```
-
-If a Rust core is later justified, PyO3/maturin can consume normalized IR without moving Python introspection into Rust.
-
-## Architectural rule
-
-New features should be expressible as composition over the five primitives whenever practical:
-
-```text
-validate = compile + inspect + enforce
-explain = inspect + render
-compare_interfaces = compile + compare
-snapshot = compile + serialize
-fingerprint = compile + canonical serialize + hash
-CI check = snapshot/baseline + compare + policy
-```
-
-If a feature requires an independent semantic compatibility implementation, that is a warning that the core abstraction is leaking.
+The initial core is Python. Normalize Python inspection objects before relation analysis, but retain the runtime identity information needed for correctness. A future native core is justified only by profiling; do not constrain 0.1 around speculative Rust or force premature portable serialization.

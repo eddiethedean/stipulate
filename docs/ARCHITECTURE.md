@@ -2,168 +2,70 @@
 
 ## Overview
 
-Stipulate is organized around a small public API backed by a compiled interface model and a runtime assignability engine.
-
 ```text
-User interface declaration
-        |
-        v
-  Interface / Protocol bridge
-        |
-        v
-   Interface compiler
-        |
-        +--> resolved annotations
-        +--> normalized member metadata
-        +--> normalized call signatures
-        +--> inherited members
-        |
-        v
-   CompiledInterface cache
-        |
-        v
-   Validation engine
-        |
-        +--> member existence
-        +--> callable compatibility
-        +--> async compatibility
-        +--> attribute/property checks
-        +--> type assignability
-        |
-        v
- structured errors or original object
+Protocol declaration
+  -> Contract[T] facade
+  -> controlled annotation resolution and member compiler
+  -> immutable ContractIR snapshot
+  -> candidate inspection (per call)
+  -> shared capability/type relation engine
+  -> Evidence + CompatibilityResult
+  -> explicit enforcement policy
+  -> original candidate or ContractError
 ```
 
-## Public layers
+Compilation failures use `ContractDefinitionError`. Inspection does not execute candidate methods or getters. Default trusted annotation evaluation may execute annotation expressions; see VALIDATION_ENGINE.md.
 
-### `Interface`
+## Public boundary
 
-`Interface` exists to provide the desired declaration syntax:
+The 0.1 entry point is `Contract(ProtocolType)`. Its constructor accepts `TypeForm[T]`, preserves T through validation, and performs a runtime supported-declaration check. A normal class, union, or arbitrary type form is not automatically a valid requirement.
 
-```python
-class Repository(Interface):
-    ...
-```
-
-The runtime implementation may use `__mro_entries__` so that a declaration receives both Stipulate runtime machinery and genuine `Protocol` behavior.
-
-For static analysis, `Interface` should be presented as the special `Protocol` base so that normal type checkers continue to recognize subclasses structurally.
-
-### `validate(interface, value)`
-
-This is the statically authoritative validation API:
-
-```python
-T = TypeVar("T")
-
-def validate(interface: type[T], value: object, *, strict: bool = False) -> T:
-    ...
-```
-
-A successful call returns the original value typed as the interface.
-
-### `InterfaceAdapter`
-
-An adapter API should support existing plain protocols without migration:
-
-```python
-adapter = InterfaceAdapter(ExistingProtocol)
-adapter.validate_python(candidate)
-```
-
-This also gives callers an explicit reusable compiled validator.
-
-### Class-side sugar
-
-Runtime classes may expose:
-
-```python
-Repository.model_validate(candidate)
-Repository.interface_schema()
-```
-
-These methods should live on Stipulate's metaclass and must never become required protocol instance members.
-
-Because Python's current typing model cannot fully express both the `Protocol` alias identity and custom metaclass API through the one-base syntax, the free `validate()` function remains the checker-authoritative form.
+`Contract` exposes `validate()`, `check()`, and `.contract` identity. Later `schema()`, `fingerprint()`, and `compare()` are release-gated. Experimental Interface class-side methods delegate to Contract and never become protocol instance members.
 
 ## Internal modules
 
-A production implementation should favor focused modules:
-
 ```text
-stipulate/
+src/stipulate/
     __init__.py
-    _interface.py
-    _compile.py
-    _members.py
-    _signatures.py
-    _assignability.py
-    _annotations.py
-    _errors.py
-    _cache.py
-    adapter.py
-    config.py
+    _contract.py        public typed facade
+    _compile.py         requirement compilation
+    _ir.py              immutable normalized records
+    _members.py         static member classification
+    _signatures.py      binding and legal call relations
+    _assignability.py   directional type relations
+    _annotations.py     trusted/raw annotation policies
+    _compatibility.py   result aggregation and enforcement
+    _evidence.py        immutable findings
+    _errors.py          public exceptions
+    _render.py          pure plain-text result/exception presentation
+    _cache.py           weak compilation cache
+    _typing_compat.py   isolated version-specific typing behavior
 ```
 
-Suggested responsibilities:
+Keep the experimental `_interface.py` bridge separate from release-critical code until accepted.
 
-- `_interface.py`: runtime `Interface` bridge and metaclass.
-- `_compile.py`: turns an interface class into `CompiledInterface`.
-- `_members.py`: member classification and metadata.
-- `_signatures.py`: callable normalization and call-shape compatibility.
-- `_assignability.py`: type relation checks.
-- `_annotations.py`: type-hint resolution and forward-reference support.
-- `_errors.py`: structured error types and rendering.
-- `_cache.py`: compiled contract caches.
-- `adapter.py`: public `InterfaceAdapter`.
-- `config.py`: strictness and future validation policies.
+## Data ownership
 
-## Core data structures
+The Contract facade strongly owns its immutable IR. The IR may strongly retain the declaration and type objects when needed to preserve identity and diagnostics. The global compilation cache must not strongly own that IR; both keys and cached IR values are weak references. See PERFORMANCE.md for lifecycle and race rules.
 
-### `CompiledInterface`
+Do not attach a globally owned adapter that closes the weak-reference lifecycle through an indirect path. Do not cache candidates or successful results globally.
 
-A compiled interface should be immutable or effectively immutable.
+## Requirement versus candidate
 
-```python
-@dataclass(frozen=True)
-class CompiledInterface:
-    interface: type
-    members: tuple[CompiledMember, ...]
-    config: InterfaceConfig
-```
+The requirement compiler has no candidate-specific state. Candidate inspection creates an ephemeral provided view with its own resolution context and evidence provenance. Expected limitations are represented as unknown facts. A current attribute value cannot substitute for a missing declared writable type.
 
-### Member kinds
+Read-only capabilities compare covariantly. Writable capabilities add contravariant write obligations. Methods compare every legal call shape, then argument/return relations. Execution-kind requirements are an explicit Stipulate policy, not inferred from textual return annotations alone.
 
-Use explicit internal member types rather than dictionaries where practical:
+## Configuration boundaries
 
-```text
-CompiledMethod
-CompiledProperty
-CompiledAttribute
-CompiledClassMethod
-CompiledStaticMethod
-```
+Annotation policy and namespace identity affect compilation and cache reuse. Strictness affects enforcement only. Mutating configuration after compilation is unsupported; create a new Contract snapshot instead.
 
-Each member should retain the original annotation objects and normalized representations needed by the validator.
+Do not hold cache locks while evaluating annotations, inspecting candidate code, or comparing types. Concurrent duplicate compilation is acceptable when publication is safe and diagnostics are deterministic. Annotation evaluation must not be advertised as exactly-once under concurrency.
 
-## Validation lifecycle
+## Presentation boundary
 
-1. Confirm the supplied interface is supported.
-2. Retrieve or compile `CompiledInterface`.
-3. Inspect the candidate safely.
-4. Validate each required member.
-5. Accumulate all independent errors rather than failing on the first mismatch.
-6. Raise one `InterfaceValidationError` if errors exist.
-7. Otherwise return the original candidate.
+The presenter accepts normalized evidence and sanitized display metadata. It produces text without invoking candidate code, checking compatibility again, or selecting a policy implicitly. Result str/repr and exception strings share this implementation. Later terminal or browser views may style the same facts; no view is permitted to promote UNKNOWN to compatible.
 
-## Safety rules
+## Extension rule
 
-Stipulate should avoid executing arbitrary implementation methods merely to determine compatibility.
-
-Introspection may access descriptors or properties if normal `getattr` is used, which can have side effects. The implementation should prefer static inspection APIs where possible and clearly distinguish declaration inspection from optional runtime-value validation.
-
-## Extension architecture
-
-The core should be designed so future support for advanced typing constructs can be added through internal handlers without making the public API unstable.
-
-Do not expose a public plugin system until the assignability semantics and internal extension points are stable.
+New types and member forms add normalized representation and relation handlers with conformance tests. They must preserve unknown evidence and share rules with future evolution analysis. A public extension/plugin framework is deferred until internal semantics stabilize.

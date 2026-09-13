@@ -1,0 +1,233 @@
+{
+  "fixture_version": 1,
+  "purpose": "Illustrative presentation fixtures; not results from an implemented Stipulate engine.",
+  "scenarios": [
+    {
+      "id": "compatible",
+      "label": "Compatible implementation",
+      "contract": "Storage",
+      "candidate": "MemoryStorage",
+      "status": "compatible",
+      "complete": true,
+      "members": 2,
+      "accepted": {
+        "strict": true,
+        "permissive": true
+      },
+      "findings": [],
+      "headline": "Compatible with Storage",
+      "summary": "All required declarations are compatible."
+    },
+    {
+      "id": "parameter",
+      "label": "Incompatible parameter",
+      "contract": "Storage",
+      "candidate": "BinaryStorage",
+      "status": "incompatible",
+      "complete": true,
+      "members": 2,
+      "accepted": {
+        "strict": false,
+        "permissive": false
+      },
+      "findings": [
+        {
+          "loc": [
+            "read",
+            "key"
+          ],
+          "type": "parameter_type",
+          "status": "incompatible",
+          "msg": "Callers may pass str; the implementation declares bytes.",
+          "expected": "str",
+          "actual": "bytes",
+          "source": "annotation",
+          "hint": "Accept str, or correct the annotation if the implementation already accepts text.",
+          "ctx": {}
+        }
+      ],
+      "headline": "Incompatible with Storage",
+      "summary": "1 incompatible finding"
+    },
+    {
+      "id": "call-shape",
+      "label": "Keyword mismatch",
+      "contract": "Storage",
+      "candidate": "LegacyStorage",
+      "status": "incompatible",
+      "complete": true,
+      "members": 2,
+      "accepted": {
+        "strict": false,
+        "permissive": false
+      },
+      "findings": [
+        {
+          "loc": [
+            "read",
+            "fresh"
+          ],
+          "type": "signature",
+          "status": "incompatible",
+          "msg": "The contract permits a fresh keyword; the implementation does not accept it.",
+          "expected": "read(key: str, *, fresh: bool = False) -> bytes",
+          "actual": "read(key: str) -> bytes",
+          "source": "signature",
+          "hint": "Accept the fresh keyword while preserving the required behavior.",
+          "ctx": {
+            "call_shape": "read(key=<str>, fresh=<bool>)"
+          }
+        }
+      ],
+      "headline": "Incompatible with Storage",
+      "summary": "1 incompatible finding"
+    },
+    {
+      "id": "missing-type",
+      "label": "Missing return annotation",
+      "contract": "Storage",
+      "candidate": "PartlyTypedStorage",
+      "status": "unknown",
+      "complete": false,
+      "members": 2,
+      "accepted": {
+        "strict": false,
+        "permissive": true
+      },
+      "findings": [
+        {
+          "loc": [
+            "read",
+            "return"
+          ],
+          "type": "annotation_missing",
+          "status": "unknown",
+          "msg": "The implementation has no return annotation.",
+          "expected": "bytes",
+          "actual": null,
+          "source": "annotation",
+          "hint": "Add an accurate return annotation. Explicitly allow missing type information only when you trust the implementation.",
+          "ctx": {}
+        }
+      ],
+      "headline": "Compatibility unknown for Storage",
+      "summary": "1 unknown finding"
+    },
+    {
+      "id": "unavailable",
+      "label": "Unavailable signature",
+      "contract": "Storage",
+      "candidate": "ExtensionStorage",
+      "status": "unknown",
+      "complete": false,
+      "members": 2,
+      "accepted": {
+        "strict": false,
+        "permissive": false
+      },
+      "findings": [
+        {
+          "loc": [
+            "read"
+          ],
+          "type": "signature_unavailable",
+          "status": "unknown",
+          "msg": "The callable signature could not be established.",
+          "expected": "read(key: str) -> bytes",
+          "actual": null,
+          "source": "inspection",
+          "hint": "Provide an inspectable, accurately annotated adapter. strict=False cannot waive an unavailable signature.",
+          "ctx": {}
+        }
+      ],
+      "headline": "Compatibility unknown for Storage",
+      "summary": "1 unknown finding"
+    },
+    {
+      "id": "mixed",
+      "label": "Mismatch and missing evidence",
+      "contract": "Storage",
+      "candidate": "MixedStorage",
+      "status": "incompatible",
+      "complete": false,
+      "members": 2,
+      "accepted": {
+        "strict": false,
+        "permissive": false
+      },
+      "findings": [
+        {
+          "loc": [
+            "read",
+            "key"
+          ],
+          "type": "parameter_type",
+          "status": "incompatible",
+          "msg": "Callers may pass str; the implementation declares bytes.",
+          "expected": "str",
+          "actual": "bytes",
+          "source": "annotation",
+          "hint": "Accept str, or correct the annotation if the implementation already accepts text.",
+          "ctx": {}
+        },
+        {
+          "loc": [
+            "write",
+            "return"
+          ],
+          "type": "annotation_missing",
+          "status": "unknown",
+          "msg": "The implementation has no return annotation.",
+          "expected": "None",
+          "actual": null,
+          "source": "annotation",
+          "hint": "Annotate the actual return behavior of write().",
+          "ctx": {}
+        }
+      ],
+      "headline": "Incompatible with Storage",
+      "summary": "1 incompatible finding \u00b7 1 unknown finding"
+    },
+    {
+      "id": "definition",
+      "label": "Unresolvable contract",
+      "contract": "Storage",
+      "candidate": null,
+      "status": null,
+      "complete": null,
+      "members": null,
+      "accepted": {
+        "strict": null,
+        "permissive": null
+      },
+      "findings": [],
+      "headline": "Cannot compile Storage",
+      "summary": "No candidate was checked.",
+      "definition_error": {
+        "loc": [
+          "read",
+          "return"
+        ],
+        "type": "annotation_unresolved",
+        "msg": "The required type Payload is not available in this declaration namespace.",
+        "hint": "Make Payload available in the defining module or provide the requirement namespace explicitly."
+      }
+    },
+    {
+      "id": "empty",
+      "label": "Empty contract",
+      "contract": "Marker",
+      "candidate": "Plugin",
+      "status": "compatible",
+      "complete": true,
+      "members": 0,
+      "accepted": {
+        "strict": true,
+        "permissive": true
+      },
+      "findings": [],
+      "headline": "Compatible with Marker",
+      "summary": "No required members. No capabilities were established."
+    }
+  ]
+}
